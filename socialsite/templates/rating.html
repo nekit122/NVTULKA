@@ -1,0 +1,16 @@
+{% extends "base.html" %}
+{% block title %}Рейтинг - NVTULKA{% endblock %}
+{% block header %}NVTULKA{% endblock %}
+{% block content %}
+<h2>🏆 Топ пользователей</h2>
+{% for user, count in top_users %}
+<div class="card" style="display: flex; align-items: center; gap: 12px;">
+    <div style="font-size: 24px; font-weight: bold; width: 40px;">{{ loop.index }}</div>
+    <img src="/static/avatars/{{ user.avatar }}" class="avatar" onerror="this.src='/static/avatars/default.png'">
+    <div>
+        <a href="/user/{{ user.id }}" class="username-link">{{ user.username }}</a>
+        <div style="color: var(--text-secondary); font-size: 13px;">{{ count }} подписчиков</div>
+    </div>
+</div>
+{% endfor %}
+{% endblock %}
