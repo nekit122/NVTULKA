@@ -1,0 +1,34 @@
+{% extends "base.html" %}
+{% block title %}Группы - NVTULKA{% endblock %}
+{% block header %}NVTULKA{% endblock %}
+{% block content %}
+<button onclick="document.getElementById('createGroupModal').classList.add('active')" class="btn">+ Создать группу</button>
+
+<div class="modal" id="createGroupModal">
+    <div class="modal-content">
+        <h3>Создать группу</h3>
+        <form action="/create_group" method="post">
+            <input type="text" name="name" placeholder="Название группы" required>
+            <textarea name="description" placeholder="Описание"></textarea>
+            <button type="submit" class="btn">Создать</button>
+            <button type="button" class="btn btn-gray" onclick="document.getElementById('createGroupModal').classList.remove('active')">Отмена</button>
+        </form>
+    </div>
+</div>
+
+<h3>Мои группы</h3>
+{% for group in user_groups %}
+<div class="card" style="display: flex; align-items: center; gap: 12px;">
+    <a href="/group/{{ group.id }}" class="username-link">{{ group.name }}</a>
+    <span style="color: var(--text-secondary);">{{ group.description[:50] }}</span>
+</div>
+{% endfor %}
+
+<h3>Все группы</h3>
+{% for group in all_groups %}
+<div class="card" style="display: flex; align-items: center; gap: 12px;">
+    <a href="/group/{{ group.id }}" class="username-link">{{ group.name }}</a>
+    <span style="color: var(--text-secondary);">{{ group.members|length }} участников</span>
+</div>
+{% endfor %}
+{% endblock %}
