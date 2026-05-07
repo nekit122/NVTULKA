@@ -9,71 +9,60 @@
 {% block content %}
 
 <!-- Stories Bar -->
-<div class="stories-bar">
-    <div class="story-item" onclick="document.getElementById('storyModal').classList.add('active')">
-        <div class="story-add">+</div>
-        <small>Добавить</small>
+{% if not feed_mode %}
+<div class="stories-bar" style="display: flex; gap: 12px; overflow-x: auto; padding: 12px 0; margin-bottom: 10px;">
+    <div class="story-item" onclick="document.getElementById('storyModal').classList.add('active')" style="text-align: center; cursor: pointer; min-width: 70px;">
+        <div style="width: 64px; height: 64px; border-radius: 50%; border: 3px dashed var(--border); display: flex; align-items: center; justify-content: center; font-size: 30px; margin: 0 auto;">+</div>
+        <small style="display: block; margin-top: 4px;">Добавить</small>
     </div>
     {% for story in stories %}
-    <div class="story-item" onclick="viewStory({{ story.id }})">
-        <div class="story-ring">
+    <div class="story-item" onclick="openStory({{ story.id }})" style="text-align: center; cursor: pointer; min-width: 70px;">
+        <div style="width: 64px; height: 64px; border-radius: 50%; border: 3px solid var(--btn-primary); padding: 2px; margin: 0 auto;">
             {% if story.is_video %}
-                <video src="/static/uploads/{{ story.filename }}"></video>
+            <video src="/static/uploads/{{ story.filename }}" style="width: 100%; height: 100%; border-radius: 50%; object-fit: cover;"></video>
             {% else %}
-                <img src="/static/uploads/{{ story.filename }}">
+            <img src="/static/uploads/{{ story.filename }}" style="width: 100%; height: 100%; border-radius: 50%; object-fit: cover;">
             {% endif %}
         </div>
-        <small>{{ story.user.username }}</small>
+        <small style="display: block; margin-top: 4px;">{{ story.user.username }}</small>
     </div>
     {% endfor %}
 </div>
+{% endif %}
 
+<!-- Posts -->
 {% if posts %}
     {% for post in posts %}
     <div class="card">
         <div style="display: flex; align-items: center; margin-bottom: 10px; gap: 10px;">
-            <img src="/static/avatars/{{ post.author.avatar }}" class="avatar-sm">
+            <img src="/static/avatars/{{ post.author.avatar }}" class="avatar-sm" onerror="this.src='/static/avatars/default.png'">
             <a href="/user/{{ post.author.id }}" class="username-link">{{ post.author.username }}</a>
             <div style="margin-left: auto; color: var(--text-secondary); font-size: 12px;">{{ post.created_at.strftime('%d.%m.%Y %H:%M') }}</div>
         </div>
         
-        {% if post.original_post %}
-            <div class="card" style="border-left: 3px solid var(--btn-primary); margin-bottom: 10px;">
-                <a href="/user/{{ post.original_post.author.id }}" class="username-link">{{ post.original_post.author.username }}</a>
-                <p>{{ post.original_post.content[:200] }}</p>
-            </div>
-        {% else %}
-            <p>{{ post.content }}</p>
-            {% if post.hashtags %}
-                <div style="margin: 5px 0;">
-                    {% for tag in post.hashtags.split(',') %}
-                        {% if tag %}<a href="/search?q=%23{{ tag }}" class="tag">#{{ tag }}</a>{% endif %}
-                    {% endfor %}
-                </div>
-            {% endif %}
+        <p>{{ post.content }}</p>
+        {% if post.hashtags %}
+        <div style="margin: 5px 0;">
+            {% for tag in post.hashtags.split(',') %}
+                {% if tag %}<a href="/search?q=%23{{ tag }}" class="tag">#{{ tag }}</a>{% endif %}
+            {% endfor %}
+        </div>
         {% endif %}
         
         {% if post.images %}
-            <div style="display: flex; gap: 5px; flex-wrap: wrap; margin-top: 10px;">
-                {% for img in post.images %}
-                    {% set ext = img.filename.split('.')[-1].lower() %}
-                    {% if ext in ['mp4', 'mov', 'avi'] %}
-                        <video controls style="max-width: 100%; max-height: 300px; border-radius: 8px;"><source src="/static/uploads/{{ img.filename }}" type="video/mp4"></video>
-                    {% else %}
-                        <img src="/static/uploads/{{ img.filename }}" style="max-width: 100%; max-height: 300px; border-radius: 8px;">
-                    {% endif %}
-                {% endfor %}
-            </div>
+        <div style="display: flex; gap: 5px; flex-wrap: wrap; margin-top: 10px;">
+            {% for img in post.images %}
+            <img src="/static/uploads/{{ img.filename }}" style="max-width: 100%; max-height: 300px; border-radius: 8px;">
+            {% endfor %}
+        </div>
         {% endif %}
         
-        <div style="display: flex; gap: 10px; margin-top: 10px; align-items: center;">
+        <div style="display: flex; gap: 10px; margin-top: 10px;">
             <button onclick="likePost({{ post.id }}, this)" class="btn btn-gray">❤️ {{ post.likes|length }}</button>
-            <form action="/repost/{{ post.id }}" method="post" style="display: inline;"><button class="btn btn-gray">🔄 {{ post.reposts|length }}</button></form>
-            <button onclick="bookmarkPost({{ post.id }}, this)" class="btn btn-gray">☆</button>
             {% if post.user_id == current_user.id %}
-                <form action="/delete_post/{{ post.id }}" method="post" style="display: inline;" onsubmit="return confirm('Удалить пост?');">
-                    <button class="btn btn-gray">🗑️</button>
-                </form>
+            <form action="/delete_post/{{ post.id }}" method="post" onsubmit="return confirm('Удалить?');">
+                <button class="btn btn-gray">🗑️</button>
+            </form>
             {% endif %}
         </div>
         
@@ -81,14 +70,12 @@
             <strong>Комментарии ({{ post.comments|length }})</strong>
             {% for comment in post.comments %}
             <div class="comment">
-                <img src="/static/avatars/{{ comment.user.avatar }}" class="avatar-sm" style="vertical-align: middle;">
                 <a href="/user/{{ comment.user.id }}" class="username-link">{{ comment.user.username }}</a>
                 <span>{{ comment.content }}</span>
-                <div style="font-size: 11px; color: var(--text-secondary);">{{ comment.created_at.strftime('%d.%m %H:%M') }}</div>
             </div>
             {% endfor %}
             <form action="/comment/{{ post.id }}" method="post" style="display: flex; gap: 5px; margin-top: 8px;">
-                <input type="text" name="content" placeholder="Написать комментарий..." style="flex: 1;">
+                <input type="text" name="content" placeholder="Комментарий..." style="flex: 1;">
                 <button type="submit" class="btn">Отправить</button>
             </form>
         </div>
@@ -98,9 +85,150 @@
     <div class="card" style="text-align: center;">Нет постов</div>
 {% endif %}
 
+<!-- STORY VIEWER -->
+<div id="storyViewer" style="display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: #000; z-index: 9999;">
+    <div style="position: absolute; top: 15px; right: 15px; z-index: 10;">
+        <button onclick="closeStory()" style="background: rgba(255,255,255,0.3); color: #fff; border: none; font-size: 28px; width: 44px; height: 44px; border-radius: 50%; cursor: pointer;">✕</button>
+    </div>
+    <div style="position: absolute; top: 10px; left: 0; right: 0; z-index: 10;">
+        <div style="display: flex; gap: 4px; padding: 0 40px;">
+            <div id="storyProgress" style="height: 3px; background: rgba(255,255,255,0.5); border-radius: 2px; flex: 1; overflow: hidden;">
+                <div id="storyProgressFill" style="height: 100%; background: #fff; width: 0%; border-radius: 2px; transition: width 0.1s linear;"></div>
+            </div>
+        </div>
+    </div>
+    <div style="position: absolute; top: 25px; left: 20px; z-index: 10; display: flex; align-items: center; gap: 10px;">
+        <div id="storyUserAvatar" style="width: 36px; height: 36px; border-radius: 50%; background: #fff; overflow: hidden;"></div>
+        <span id="storyUsername" style="color: #fff; font-weight: bold;"></span>
+        <span id="storyTime" style="color: rgba(255,255,255,0.7); font-size: 12px;"></span>
+    </div>
+    <div id="storyContent" style="width: 100%; height: 100%; display: flex; align-items: center; justify-content: center;"></div>
+    <!-- Навигация -->
+    <div onclick="prevStory()" style="position: absolute; left: 0; top: 0; width: 30%; height: 100%; cursor: pointer;"></div>
+    <div onclick="nextStory()" style="position: absolute; right: 0; top: 0; width: 30%; height: 100%; cursor: pointer;"></div>
+</div>
+
 <script>
-function viewStory(id) {
-    alert('Просмотр истории #' + id);
+let allStories = [];
+let currentStoryIndex = 0;
+let storyTimer = null;
+
+function openStory(storyId) {
+    // Собираем все сторис со страницы
+    const storyItems = document.querySelectorAll('.story-item');
+    allStories = [];
+    storyItems.forEach((item, index) => {
+        const img = item.querySelector('img');
+        const video = item.querySelector('video');
+        const username = item.querySelector('small').textContent;
+        if (img || video) {
+            allStories.push({
+                src: (video || img).src,
+                isVideo: !!video,
+                username: username,
+                avatar: '/static/avatars/default.png'
+            });
+            if (item.onclick && item.onclick.toString().includes(storyId)) {
+                currentStoryIndex = allStories.length - 1;
+            }
+        }
+    });
+    
+    if (allStories.length > 0) {
+        showCurrentStory();
+        document.getElementById('storyViewer').style.display = 'block';
+    }
 }
+
+function showCurrentStory() {
+    if (currentStoryIndex >= allStories.length) {
+        closeStory();
+        return;
+    }
+    
+    const story = allStories[currentStoryIndex];
+    document.getElementById('storyUsername').textContent = story.username;
+    
+    const content = document.getElementById('storyContent');
+    content.innerHTML = '';
+    
+    if (story.isVideo) {
+        const video = document.createElement('video');
+        video.src = story.src;
+        video.autoplay = true;
+        video.controls = false;
+        video.style.cssText = 'max-width: 100%; max-height: 100%; object-fit: contain;';
+        video.onended = function() {
+            nextStory();
+        };
+        content.appendChild(video);
+        
+        // Прогресс-бар для видео
+        video.ontimeupdate = function() {
+            const pct = (video.currentTime / video.duration) * 100;
+            document.getElementById('storyProgressFill').style.width = pct + '%';
+        };
+    } else {
+        const img = document.createElement('img');
+        img.src = story.src;
+        img.style.cssText = 'max-width: 100%; max-height: 100%; object-fit: contain;';
+        content.appendChild(img);
+        
+        // Автопереключение через 5 секунд для фото
+        let progress = 0;
+        document.getElementById('storyProgressFill').style.width = '0%';
+        clearInterval(storyTimer);
+        storyTimer = setInterval(function() {
+            progress += 2;
+            document.getElementById('storyProgressFill').style.width = progress + '%';
+            if (progress >= 100) {
+                clearInterval(storyTimer);
+                nextStory();
+            }
+        }, 100);
+    }
+}
+
+function nextStory() {
+    clearInterval(storyTimer);
+    currentStoryIndex++;
+    if (currentStoryIndex >= allStories.length) {
+        closeStory();
+    } else {
+        showCurrentStory();
+    }
+}
+
+function prevStory() {
+    clearInterval(storyTimer);
+    currentStoryIndex--;
+    if (currentStoryIndex < 0) {
+        currentStoryIndex = 0;
+    }
+    showCurrentStory();
+}
+
+function closeStory() {
+    clearInterval(storyTimer);
+    document.getElementById('storyViewer').style.display = 'none';
+    const content = document.getElementById('storyContent');
+    content.innerHTML = '';
+}
+
+function likePost(postId, btn) {
+    fetch('/like/' + postId, { method: 'POST' })
+        .then(function(r) { return r.json(); })
+        .then(function(data) {
+            btn.innerHTML = '❤️ ' + data.likes;
+        });
+}
+
+// Добавление сторис
+document.getElementById('storyModal').addEventListener('click', function(e) {
+    if (e.target === this) {
+        this.classList.remove('active');
+    }
+});
 </script>
+
 {% endblock %}
