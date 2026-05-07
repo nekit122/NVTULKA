@@ -1,0 +1,26 @@
+{% extends "base.html" %}
+{% block title %}Музыка - NVTULKA{% endblock %}
+{% block header %}🎵 Музыка{% endblock %}
+{% block content %}
+<div class="card">
+    <form action="/upload_music" method="post" enctype="multipart/form-data" style="display: flex; gap: 10px;">
+        <input type="file" name="music" accept=".mp3" required style="flex: 1;">
+        <button type="submit" class="btn">Загрузить</button>
+    </form>
+</div>
+
+<div class="card">
+    <h4>Треки</h4>
+    {% if music_files %}
+        {% for file in music_files %}
+        <div style="display: flex; align-items: center; gap: 10px; padding: 10px; background: var(--btn-gray); border-radius: 8px; margin: 5px 0;">
+            <span>🎵</span>
+            <span style="flex: 1;">{{ file }}</span>
+            <audio controls style="flex: 2;"><source src="/static/music/{{ file }}" type="audio/mpeg"></audio>
+        </div>
+        {% endfor %}
+    {% else %}
+        <p style="text-align: center; color: var(--text-secondary);">Нет треков. Загрузите первый!</p>
+    {% endif %}
+</div>
+{% endblock %}
