@@ -3,28 +3,58 @@
 {% block header %}NVTULKA{% endblock %}
 {% block content %}
 <div class="card" style="text-align: center;">
-    <img src="/static/avatars/{{ user.avatar }}" class="avatar" style="width: 80px; height: 80px;">
+    <img src="/static/avatars/{{ user.avatar }}" class="avatar" style="width: 80px; height: 80px;" onerror="this.src='/static/avatars/default.png'">
     <h2>{{ user.username }}</h2>
+    <div style="color: var(--text-secondary);">{{ get_user_status(user) }}</div>
     <p>{{ user.bio or 'Био пока нет' }}</p>
+    <p>🪙 Монеты: {{ user.coins }}</p>
     <div class="stats">
         <div class="stat-item"><strong>{{ posts|length }}</strong><span>постов</span></div>
         <div class="stat-item"><strong>{{ followers_count }}</strong><span>подписчиков</span></div>
         <div class="stat-item"><strong>{{ following_count }}</strong><span>подписок</span></div>
-        <div class="stat-item"><strong>{{ profile_views }}</strong><span>просмотров</span></div>
     </div>
-    <button onclick="document.getElementById('editProfileModal').classList.add('active')" class="btn btn-gray">Редактировать профиль</button>
+    <div style="display: flex; gap: 10px; justify-content: center; flex-wrap: wrap;">
+        <button onclick="document.getElementById('editProfileModal').classList.add('active')" class="btn btn-gray">✏️ Редактировать</button>
+        <button onclick="document.getElementById('statusModal').classList.add('active')" class="btn btn-gray">💬 Статус</button>
+    </div>
 </div>
 
+<!-- Полученные подарки -->
+{% if gifts %}
+<div class="card">
+    <h3>🎁 Подарки</h3>
+    <div style="display: flex; gap: 10px; flex-wrap: wrap;">
+        {% for gift in gifts %}
+        <div title="От: {{ gift.sender_id }}">{{ gift.gift_type }}</div>
+        {% endfor %}
+    </div>
+</div>
+{% endif %}
+
+<!-- Модалка редактирования -->
 <div class="modal" id="editProfileModal">
     <div class="modal-content">
         <h3>Редактировать профиль</h3>
         <form action="/update_profile" method="post" enctype="multipart/form-data">
-            <label>Аватар</label>
-            <input type="file" name="avatar" accept="image/*"><br>
-            <label>Био</label>
-            <textarea name="bio" maxlength="300">{{ user.bio or '' }}</textarea><br>
+            <label>Аватар</label><input type="file" name="avatar" accept="image/*"><br>
+            <label>Био</label><textarea name="bio" maxlength="300">{{ user.bio or '' }}</textarea><br>
             <button type="submit" class="btn">Сохранить</button>
             <button type="button" class="btn btn-gray" onclick="document.getElementById('editProfileModal').classList.remove('active')">Отмена</button>
+        </form>
+    </div>
+</div>
+
+<!-- Модалка статуса -->
+<div class="modal" id="statusModal">
+    <div class="modal-content">
+        <h3>Установить статус</h3>
+        <form action="/set_status" method="post">
+            <label>Эмодзи</label>
+            <input type="text" name="emoji" maxlength="10" placeholder="💬">
+            <label>Текст</label>
+            <input type="text" name="text" maxlength="200" placeholder="Ваш статус...">
+            <button type="submit" class="btn">Сохранить</button>
+            <button type="button" class="btn btn-gray" onclick="document.getElementById('statusModal').classList.remove('active')">Отмена</button>
         </form>
     </div>
 </div>
@@ -32,19 +62,15 @@
 <h3>Мои посты</h3>
 {% for post in posts %}
 <div class="card">
-    {% if post.is_pinned %}<div style="color: var(--link); font-weight: bold;">📌 Закреплённый пост</div>{% endif %}
-    <p>{{ post.content }}</p>
+    <p>{{ post.content|safe }}</p>
     {% if post.images %}
     <div style="display: flex; gap: 5px; flex-wrap: wrap;">
         {% for img in post.images %}
-            <img src="/static/uploads/{{ img.filename }}" style="max-width: 100%; max-height: 300px; border-radius: 8px;">
+        <img src="/static/uploads/{{ img.filename }}" style="max-width: 100%; max-height: 300px; border-radius: 8px;">
         {% endfor %}
     </div>
     {% endif %}
-    <div style="display: flex; gap: 10px; margin-top: 10px;">
-        <form action="/pin_post/{{ post.id }}" method="post"><button class="btn btn-gray">📌</button></form>
-        <form action="/delete_post/{{ post.id }}" method="post" onsubmit="return confirm('Удалить?');"><button class="btn btn-gray">🗑️</button></form>
-    </div>
+    <div style="color: var(--text-secondary); font-size: 12px; margin-top: 8px;">{{ post.created_at.strftime('%d.%m.%Y %H:%M') }}</div>
 </div>
 {% endfor %}
 {% endblock %}
