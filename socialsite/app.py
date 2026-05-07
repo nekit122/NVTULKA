@@ -194,7 +194,7 @@ def recommendations():
     posts = Post.query.filter(Post.original_post_id == None).order_by(Post.created_at.desc()).all()
     from datetime import timedelta
 cutoff = datetime.utcnow() - timedelta(hours=24)
-stories = []
+    stories = []
     return render_template('recommendations.html', posts=posts, stories=stories, unread_count=get_unread_count())
 
 @app.route('/feed')
