@@ -24,6 +24,8 @@ login_manager.login_view = 'login'
 os.makedirs(app.config['UPLOAD_FOLDER'], exist_ok=True)
 os.makedirs(app.config['AVATARS_FOLDER'], exist_ok=True)
 
+# ========== MODELS ==========
+
 class User(UserMixin, db.Model):
     id = db.Column(db.Integer, primary_key=True)
     username = db.Column(db.String(80), unique=True, nullable=False)
@@ -32,6 +34,8 @@ class User(UserMixin, db.Model):
     avatar = db.Column(db.String(200), default='default.png')
     bio = db.Column(db.String(300), default='')
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
+    posts = db.relationship('Post', backref='author', lazy=True)
+    stories = db.relationship('Story', backref='user', lazy=True)
 
 class Post(db.Model):
     id = db.Column(db.Integer, primary_key=True)
@@ -44,7 +48,6 @@ class Post(db.Model):
     likes = db.relationship('Like', backref='post', lazy=True, cascade='all, delete-orphan')
     comments = db.relationship('Comment', backref='post', lazy=True, cascade='all, delete-orphan')
     images = db.relationship('PostImage', backref='post', lazy=True, cascade='all, delete-orphan')
-    author = db.relationship('User', backref='posts')
 
 class PostImage(db.Model):
     id = db.Column(db.Integer, primary_key=True)
@@ -63,18 +66,6 @@ class Like(db.Model):
     id = db.Column(db.Integer, primary_key=True)
     user_id = db.Column(db.Integer, db.ForeignKey('user.id'))
     post_id = db.Column(db.Integer, db.ForeignKey('post.id'))
-
-class Repost(db.Model):
-    id = db.Column(db.Integer, primary_key=True)
-    user_id = db.Column(db.Integer, db.ForeignKey('user.id'))
-    post_id = db.Column(db.Integer, db.ForeignKey('post.id'))
-    created_at = db.Column(db.DateTime, default=datetime.utcnow)
-
-class Bookmark(db.Model):
-    id = db.Column(db.Integer, primary_key=True)
-    user_id = db.Column(db.Integer, db.ForeignKey('user.id'))
-    post_id = db.Column(db.Integer, db.ForeignKey('post.id'))
-    created_at = db.Column(db.DateTime, default=datetime.utcnow)
 
 class Follow(db.Model):
     id = db.Column(db.Integer, primary_key=True)
@@ -99,6 +90,13 @@ class Notification(db.Model):
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
     from_user = db.relationship('User', foreign_keys=[from_user_id])
 
+class Story(db.Model):
+    id = db.Column(db.Integer, primary_key=True)
+    user_id = db.Column(db.Integer, db.ForeignKey('user.id'), nullable=False)
+    filename = db.Column(db.String(200), nullable=False)
+    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+    is_video = db.Column(db.Boolean, default=False)
+
 @login_manager.user_loader
 def load_user(user_id):
     return db.session.get(User, int(user_id))
@@ -121,6 +119,8 @@ def get_unread_count():
         msgs = Message.query.filter_by(receiver_id=current_user.id, is_read=False).count()
         return notifs + msgs
     return 0
+
+# ========== ROUTES ==========
 
 @app.route('/')
 def index():
@@ -168,7 +168,9 @@ def logout():
 @login_required
 def recommendations():
     posts = Post.query.filter(Post.original_post_id == None).order_by(Post.created_at.desc()).all()
-    return render_template('recommendations.html', posts=posts, unread_count=get_unread_count())
+    cutoff = datetime.utcnow() - timedelta(hours=24)
+    stories = Story.query.filter(Story.created_at > cutoff).order_by(Story.created_at.desc()).all()
+    return render_template('recommendations.html', posts=posts, stories=stories, unread_count=get_unread_count())
 
 @app.route('/feed')
 @login_required
@@ -208,7 +210,7 @@ def send_message(receiver_id):
         msg = Message(sender_id=current_user.id, receiver_id=receiver_id, content=content)
         db.session.add(msg)
         db.session.commit()
-        return jsonify({'status': 'ok', 'timestamp': msg.timestamp.strftime('%H:%M')})
+        return jsonify({'status': 'ok'})
     return jsonify({'status': 'error'}), 400
 
 @app.route('/send_voice/<int:receiver_id>', methods=['POST'])
@@ -249,6 +251,19 @@ def create_post():
         if filename:
             db.session.add(PostImage(post_id=post.id, filename=filename))
     db.session.commit()
+    return redirect(url_for('recommendations'))
+
+@app.route('/create_story', methods=['POST'])
+@login_required
+def create_story():
+    file = request.files.get('story')
+    if file:
+        filename = save_file(file, app.config['UPLOAD_FOLDER'])
+        if filename:
+            is_video = filename.endswith('.mp4') or filename.endswith('.mov')
+            story = Story(user_id=current_user.id, filename=filename, is_video=is_video)
+            db.session.add(story)
+            db.session.commit()
     return redirect(url_for('recommendations'))
 
 @app.route('/delete_post/<int:post_id>', methods=['POST'])
@@ -302,7 +317,8 @@ def user_page(user_id):
     posts = Post.query.filter_by(user_id=user.id, original_post_id=None).order_by(Post.created_at.desc()).all()
     followers_count = Follow.query.filter_by(followed_id=user.id).count()
     following_count = Follow.query.filter_by(follower_id=user.id).count()
-    return render_template('user_page.html', user=user, posts=posts, followers_count=followers_count, following_count=following_count, unread_count=get_unread_count())
+    is_following = Follow.query.filter_by(follower_id=current_user.id, followed_id=user.id).first() is not None
+    return render_template('user_page.html', user=user, posts=posts, followers_count=followers_count, following_count=following_count, is_following=is_following, unread_count=get_unread_count())
 
 @app.route('/profile')
 @login_required
@@ -335,6 +351,13 @@ def notifications():
 def unread_count():
     return jsonify({'count': get_unread_count()})
 
+@app.route('/notifications/read', methods=['POST'])
+@login_required
+def mark_read():
+    Notification.query.filter_by(user_id=current_user.id, is_read=False).update({'is_read': True})
+    db.session.commit()
+    return jsonify({'status': 'ok'})
+
 @app.route('/games')
 @login_required
 def games():
@@ -360,6 +383,7 @@ def trends():
 def profile_views():
     return render_template('profile_views.html', views=[], unread_count=get_unread_count())
 
+# ========== INIT ==========
 with app.app_context():
     db.create_all()
 
