@@ -14,26 +14,58 @@
         {% endfor %}
     </div>
     <div style="display: flex; gap: 8px;">
-        <input type="text" id="msgInput" placeholder="Сообщение..." style="flex: 1;">
+        <input type="text" id="msgInput" placeholder="Сообщение..." style="flex: 1; padding: 10px; border: 1px solid var(--border); border-radius: 20px; background: var(--input-bg); color: var(--text);">
         <button onclick="sendMessage()" class="btn" style="border-radius: 20px;">➤</button>
     </div>
 </div>
+
 <script>
 function sendMessage() {
     const input = document.getElementById('msgInput');
     const content = input.value.trim();
     if (!content) return;
+    
     fetch('/send_message/{{ friend.id }}', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ content: content })
-    }).then(r => r.json()).then(data => {
-        if (data.status === 'ok') location.reload();
+    })
+    .then(r => r.json())
+    .then(data => {
+        if (data.status === 'ok') {
+            input.value = '';
+            loadNewMessages();
+        }
     });
-    input.value = '';
 }
+
+function loadNewMessages() {
+    fetch(window.location.href)
+        .then(r => r.text())
+        .then(html => {
+            const parser = new DOMParser();
+            const doc = parser.parseFromString(html, 'text/html');
+            const newMessages = doc.getElementById('messages');
+            if (newMessages) {
+                document.getElementById('messages').innerHTML = newMessages.innerHTML;
+                const container = document.getElementById('messages');
+                container.scrollTop = container.scrollHeight;
+            }
+        });
+}
+
 document.getElementById('msgInput').addEventListener('keydown', function(e) {
-    if (e.key === 'Enter') sendMessage();
+    if (e.key === 'Enter') {
+        e.preventDefault();
+        sendMessage();
+    }
 });
+
+setInterval(loadNewMessages, 2000);
+
+window.onload = function() {
+    const container = document.getElementById('messages');
+    container.scrollTop = container.scrollHeight;
+};
 </script>
 {% endblock %}
