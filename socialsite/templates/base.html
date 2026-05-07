@@ -160,4 +160,174 @@
                 {{ unread_count if unread_count else '' }}
             </span>
             <div class="notif-dropdown" id="notifDropdown">
-                <div style="padding: 12px 16px; font-weight: bold;
+                <div style="padding: 12px 16px; font-weight: bold; border-bottom: 1px solid var(--border);">
+                    Уведомления
+                    <a href="/notifications" style="float: right; font-size: 12px; color: var(--link);">Все</a>
+                </div>
+                <div id="notifList">
+                    <div style="padding: 20px; text-align: center;">Загрузка...</div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="overlay" id="overlay" onclick="closeMenu()"></div>
+    <div class="side-menu" id="sideMenu">
+        <div class="menu-header">
+            <strong>{{ current_user.username if current_user.is_authenticated else 'Гость' }}</strong>
+        </div>
+        <a href="/profile">👤 Мой профиль</a>
+        <a href="/friends">👥 Друзья</a>
+        <a href="/feed">📰 Моя лента</a>
+        <a href="/recommendations">🌍 Рекомендации</a>
+        <a href="/search">🔍 Поиск</a>
+        <a href="/bookmarks">⭐ Закладки</a>
+        <a href="/trends">📈 Тренды</a>
+        <a href="/games">🎮 Мини-игры</a>
+        <a href="/music">🎵 Музыка</a>
+        <a href="/profile_views">👀 Кто заходил</a>
+        <a href="#" onclick="toggleTheme()">🌓 Тёмная тема</a>
+        <a href="/logout">🚪 Выйти</a>
+    </div>
+
+    <div class="container">
+        {% block content %}{% endblock %}
+    </div>
+
+    <nav class="bottom-nav">
+        <a href="#" onclick="toggleMenu()"><span class="icon">☰</span>Меню</a>
+        <a href="/friends"><span class="icon">👥</span>Друзья</a>
+        <a href="/feed"><span class="icon">📰</span>Лента</a>
+        <a href="/search"><span class="icon">🔍</span>Поиск</a>
+        <a href="#" onclick="document.getElementById('postModal').classList.add('active')"><span class="icon">✏️</span>Пост</a>
+    </nav>
+
+    <div class="modal" id="postModal">
+        <div class="modal-content">
+            <h3>Новый пост</h3>
+            <form action="/create_post" method="post" enctype="multipart/form-data">
+                <textarea name="content" placeholder="Что у вас нового? #хештеги работают!" required></textarea><br>
+                <input type="file" name="images" accept="image/*,video/*" multiple><br><br>
+                <button type="submit" class="btn">Опубликовать</button>
+                <button type="button" class="btn btn-gray" onclick="document.getElementById('postModal').classList.remove('active')">Отмена</button>
+            </form>
+        </div>
+    </div>
+
+    <div class="modal" id="storyModal">
+        <div class="modal-content">
+            <h3>Добавить историю</h3>
+            <form action="/create_story" method="post" enctype="multipart/form-data">
+                <input type="file" name="story" accept="image/*,video/*" required><br><br>
+                <button type="submit" class="btn">Опубликовать</button>
+                <button type="button" class="btn btn-gray" onclick="document.getElementById('storyModal').classList.remove('active')">Отмена</button>
+            </form>
+        </div>
+    </div>
+
+    <script>
+        function toggleMenu() {
+            document.getElementById('sideMenu').classList.toggle('open');
+            document.getElementById('overlay').classList.toggle('show');
+        }
+        function closeMenu() {
+            document.getElementById('sideMenu').classList.remove('open');
+            document.getElementById('overlay').classList.remove('show');
+        }
+        
+        function toggleTheme() {
+            document.body.classList.toggle('dark-theme');
+            localStorage.setItem('theme', document.body.classList.contains('dark-theme') ? 'dark' : 'light');
+            closeMenu();
+        }
+        
+        if (localStorage.getItem('theme') === 'dark') {
+            document.body.classList.add('dark-theme');
+        }
+        
+        function toggleNotifications() {
+            const dropdown = document.getElementById('notifDropdown');
+            dropdown.classList.toggle('open');
+            if (dropdown.classList.contains('open')) {
+                loadNotifications();
+                markAsRead();
+            }
+        }
+        
+        function loadNotifications() {
+            fetch('/notifications')
+                .then(r => r.text())
+                .then(html => {
+                    const parser = new DOMParser();
+                    const doc = parser.parseFromString(html, 'text/html');
+                    const items = doc.querySelectorAll('.notif-item');
+                    const list = document.getElementById('notifList');
+                    if (items.length === 0) {
+                        list.innerHTML = '<div style="padding: 20px; text-align: center;">Нет уведомлений</div>';
+                    } else {
+                        list.innerHTML = '';
+                        items.forEach(item => list.appendChild(item.cloneNode(true)));
+                    }
+                });
+        }
+        
+        function markAsRead() {
+            fetch('/notifications/read', { method: 'POST' });
+            document.getElementById('bellBadge').classList.remove('show');
+        }
+        
+        function followUser(userId, btn) {
+            fetch('/follow/' + userId, { method: 'POST' })
+                .then(r => r.json())
+                .then(data => {
+                    if (data.status === 'followed') {
+                        btn.textContent = 'Отписаться';
+                        btn.className = 'btn btn-gray';
+                    } else if (data.status === 'unfollowed') {
+                        btn.textContent = 'Подписаться';
+                        btn.className = 'btn';
+                    }
+                });
+        }
+        
+        function likePost(postId, btn) {
+            fetch('/like/' + postId, { method: 'POST' })
+                .then(r => r.json())
+                .then(data => {
+                    btn.innerHTML = '❤️ ' + data.likes;
+                });
+        }
+        
+        function bookmarkPost(postId, btn) {
+            fetch('/bookmark/' + postId, { method: 'POST' })
+                .then(r => r.json())
+                .then(data => {
+                    btn.textContent = data.status === 'bookmarked' ? '⭐' : '☆';
+                });
+        }
+        
+        setInterval(() => {
+            fetch('/notifications/unread-count')
+                .then(r => r.json())
+                .then(data => {
+                    const badge = document.getElementById('bellBadge');
+                    if (data.count > 0) {
+                        badge.textContent = data.count;
+                        badge.classList.add('show');
+                    } else {
+                        badge.textContent = '';
+                        badge.classList.remove('show');
+                    }
+                });
+        }, 10000);
+        
+        document.addEventListener('click', function(e) {
+            const container = document.querySelector('.bell-container');
+            if (container && !container.contains(e.target)) {
+                document.getElementById('notifDropdown').classList.remove('open');
+            }
+        });
+    </script>
+    {% block scripts %}{% endblock %}
+</body>
+</html>
