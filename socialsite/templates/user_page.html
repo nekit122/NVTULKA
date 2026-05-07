@@ -3,48 +3,85 @@
 {% block header %}NVTULKA{% endblock %}
 {% block content %}
 <div class="card" style="text-align: center;">
-    <img src="/static/avatars/{{ user.avatar }}" class="avatar" style="width: 80px; height: 80px;">
+    <img src="/static/avatars/{{ user.avatar }}" class="avatar" style="width: 80px; height: 80px;" onerror="this.src='/static/avatars/default.png'">
     <h2>{{ user.username }}</h2>
+    <div style="color: var(--text-secondary);">{{ get_user_status(user) }}</div>
     <p>{{ user.bio or 'Био пока нет' }}</p>
     <div class="stats">
         <div class="stat-item"><strong>{{ posts|length }}</strong><span>постов</span></div>
         <div class="stat-item"><strong>{{ followers_count }}</strong><span>подписчиков</span></div>
         <div class="stat-item"><strong>{{ following_count }}</strong><span>подписок</span></div>
-        <div class="stat-item"><strong>{{ likes_count }}</strong><span>лайков</span></div>
-        <div class="stat-item"><strong>{{ profile_views }}</strong><span>просмотров</span></div>
     </div>
-    <div class="actions">
-        {% if user.id != current_user.id %}
-            <button onclick="followUser({{ user.id }}, this)" class="btn {% if is_following %}btn-gray{% endif %}">
-                {{ 'Отписаться' if is_following else 'Подписаться' }}
-            </button>
-            {% if is_mutual %}
-                <a href="/chat/{{ user.id }}" class="btn">💬 Чат</a>
-            {% endif %}
-        {% endif %}
+    {% if user.id != current_user.id %}
+    <div style="display: flex; gap: 10px; justify-content: center; flex-wrap: wrap;">
+        <button onclick="followUser({{ user.id }}, this)" class="btn {% if is_following %}btn-gray{% endif %}">
+            {{ 'Отписаться' if is_following else 'Подписаться' }}
+        </button>
+        <button onclick="document.getElementById('giftModal').classList.add('active')" class="btn">🎁 Подарок</button>
+        <a href="/chat/{{ user.id }}" class="btn">💬 Чат</a>
+    </div>
+    {% endif %}
+</div>
+
+<!-- Модалка подарка -->
+<div class="modal" id="giftModal">
+    <div class="modal-content">
+        <h3>Отправить подарок</h3>
+        <form onsubmit="sendGift(event, {{ user.id }})">
+            <label>Подарок:</label>
+            <select id="giftType" style="width: 100%; padding: 10px; margin: 10px 0;">
+                <option value="❤️">❤️ Сердце (10🪙)</option>
+                <option value="🌹">🌹 Роза (10🪙)</option>
+                <option value="🎉">🎉 Салют (10🪙)</option>
+                <option value="⭐">⭐ Звезда (10🪙)</option>
+                <option value="💎">💎 Бриллиант (10🪙)</option>
+            </select>
+            <input type="text" id="giftMessage" placeholder="Сообщение..." maxlength="200">
+            <button type="submit" class="btn">Отправить</button>
+            <button type="button" class="btn btn-gray" onclick="document.getElementById('giftModal').classList.remove('active')">Отмена</button>
+        </form>
     </div>
 </div>
 
-<h3>Посты</h3>
-{% for post in posts %}
+<!-- Подарки -->
+{% if gifts %}
 <div class="card">
-    {% if post.is_pinned %}<div style="color: var(--link); font-weight: bold;">📌</div>{% endif %}
-    <p>{{ post.content }}</p>
-    {% if post.hashtags %}
-    <div>
-        {% for tag in post.hashtags.split(',') %}
-            {% if tag %}<a href="/search?q=%23{{ tag }}" class="tag">#{{ tag }}</a>{% endif %}
+    <h3>🎁 Подарки</h3>
+    <div style="display: flex; gap: 10px; flex-wrap: wrap;">
+        {% for gift in gifts %}
+        <div title="{{ gift.message }}">{% if gift.sender_id == current_user.id %}Вы{% else %}Пользователь {{ gift.sender_id }}{% endif %}: {{ gift.gift_type }}</div>
         {% endfor %}
     </div>
-    {% endif %}
+</div>
+{% endif %}
+
+<h3>Посты {{ user.username }}</h3>
+{% for post in posts %}
+<div class="card">
+    <p>{{ post.content|safe }}</p>
     {% if post.images %}
     <div style="display: flex; gap: 5px; flex-wrap: wrap;">
         {% for img in post.images %}
-            <img src="/static/uploads/{{ img.filename }}" style="max-width: 100%; max-height: 300px; border-radius: 8px;">
+        <img src="/static/uploads/{{ img.filename }}" style="max-width: 100%; max-height: 300px; border-radius: 8px;">
         {% endfor %}
     </div>
     {% endif %}
     <button onclick="likePost({{ post.id }}, this)" class="btn btn-gray" style="margin-top: 10px;">❤️ {{ post.likes|length }}</button>
 </div>
 {% endfor %}
+
+<script>
+function sendGift(e, userId) {
+    e.preventDefault();
+    const formData = new FormData();
+    formData.append('gift_type', document.getElementById('giftType').value);
+    formData.append('message', document.getElementById('giftMessage').value);
+    fetch('/send_gift/' + userId, { method: 'POST', body: formData })
+        .then(r => r.json())
+        .then(data => {
+            if (data.error) alert(data.error);
+            else { alert('Подарок отправлен!'); location.reload(); }
+        });
+}
+</script>
 {% endblock %}
