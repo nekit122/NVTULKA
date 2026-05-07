@@ -4,8 +4,7 @@ from flask_login import LoginManager, UserMixin, login_user, login_required, log
 from werkzeug.security import generate_password_hash, check_password_hash
 from werkzeug.utils import secure_filename
 from datetime import datetime, timedelta
-import os
-import re
+import os, re, json
 
 app = Flask(__name__)
 app.config['SECRET_KEY'] = os.environ.get('SECRET_KEY', 'supersecretkey123')
@@ -15,7 +14,7 @@ if database_url and database_url.startswith('postgres://'):
 app.config['SQLALCHEMY_DATABASE_URI'] = database_url
 app.config['UPLOAD_FOLDER'] = 'static/uploads'
 app.config['AVATARS_FOLDER'] = 'static/avatars'
-app.config['MAX_CONTENT_LENGTH'] = 100 * 1024 * 1024
+app.config['MAX_CONTENT_LENGTH'] = 200 * 1024 * 1024
 db = SQLAlchemy(app)
 login_manager = LoginManager()
 login_manager.init_app(app)
@@ -33,9 +32,18 @@ class User(UserMixin, db.Model):
     password_hash = db.Column(db.String(200), nullable=False)
     avatar = db.Column(db.String(200), default='default.png')
     bio = db.Column(db.String(300), default='')
+    coins = db.Column(db.Integer, default=100)
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
     posts = db.relationship('Post', backref='author', lazy=True)
     stories = db.relationship('Story', backref='user', lazy=True)
+    status = db.relationship('Status', backref='user', uselist=False, lazy=True)
+
+class Status(db.Model):
+    id = db.Column(db.Integer, primary_key=True)
+    user_id = db.Column(db.Integer, db.ForeignKey('user.id'), unique=True)
+    text = db.Column(db.String(200), default='')
+    emoji = db.Column(db.String(10), default='💬')
+    updated_at = db.Column(db.DateTime, default=datetime.utcnow)
 
 class Post(db.Model):
     id = db.Column(db.Integer, primary_key=True)
@@ -45,6 +53,9 @@ class Post(db.Model):
     is_pinned = db.Column(db.Boolean, default=False)
     original_post_id = db.Column(db.Integer, db.ForeignKey('post.id'), nullable=True)
     hashtags = db.Column(db.Text, default='')
+    is_poll = db.Column(db.Boolean, default=False)
+    poll_options = db.Column(db.Text, default='')
+    poll_votes = db.Column(db.Text, default='{}')
     likes = db.relationship('Like', backref='post', lazy=True, cascade='all, delete-orphan')
     comments = db.relationship('Comment', backref='post', lazy=True, cascade='all, delete-orphan')
     images = db.relationship('PostImage', backref='post', lazy=True, cascade='all, delete-orphan')
@@ -66,6 +77,12 @@ class Like(db.Model):
     id = db.Column(db.Integer, primary_key=True)
     user_id = db.Column(db.Integer, db.ForeignKey('user.id'))
     post_id = db.Column(db.Integer, db.ForeignKey('post.id'))
+
+class PollVote(db.Model):
+    id = db.Column(db.Integer, primary_key=True)
+    user_id = db.Column(db.Integer, db.ForeignKey('user.id'))
+    post_id = db.Column(db.Integer, db.ForeignKey('post.id'))
+    option_index = db.Column(db.Integer)
 
 class Follow(db.Model):
     id = db.Column(db.Integer, primary_key=True)
@@ -97,17 +114,58 @@ class Story(db.Model):
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
     is_video = db.Column(db.Boolean, default=False)
 
+class Gift(db.Model):
+    id = db.Column(db.Integer, primary_key=True)
+    sender_id = db.Column(db.Integer, db.ForeignKey('user.id'))
+    receiver_id = db.Column(db.Integer, db.ForeignKey('user.id'))
+    gift_type = db.Column(db.String(30))
+    message = db.Column(db.String(200))
+    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+
+class Group(db.Model):
+    id = db.Column(db.Integer, primary_key=True)
+    name = db.Column(db.String(100), nullable=False)
+    description = db.Column(db.Text, default='')
+    creator_id = db.Column(db.Integer, db.ForeignKey('user.id'))
+    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+    members = db.relationship('GroupMember', backref='group', lazy=True)
+    posts = db.relationship('GroupPost', backref='group', lazy=True)
+
+class GroupMember(db.Model):
+    id = db.Column(db.Integer, primary_key=True)
+    group_id = db.Column(db.Integer, db.ForeignKey('group.id'))
+    user_id = db.Column(db.Integer, db.ForeignKey('user.id'))
+    role = db.Column(db.String(20), default='member')
+
+class GroupPost(db.Model):
+    id = db.Column(db.Integer, primary_key=True)
+    group_id = db.Column(db.Integer, db.ForeignKey('group.id'))
+    user_id = db.Column(db.Integer, db.ForeignKey('user.id'))
+    content = db.Column(db.Text, nullable=False)
+    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+    user = db.relationship('User')
+
 @login_manager.user_loader
 def load_user(user_id):
     return db.session.get(User, int(user_id))
 
+# ========== HELPERS ==========
+
 def extract_hashtags(text):
     return ','.join(re.findall(r'#(\w+)', text))
+
+def extract_mentions(text):
+    mentions = re.findall(r'@(\w+)', text)
+    for mention in mentions:
+        user = User.query.filter_by(username=mention).first()
+        if user:
+            text = text.replace(f'@{mention}', f'<a href="/user/{user.id}" style="color: var(--link); font-weight: bold;">@{mention}</a>')
+    return text
 
 def save_file(file, folder):
     if file and file.filename:
         ext = os.path.splitext(file.filename)[1].lower()
-        if ext in ['.jpg', '.jpeg', '.png', '.gif', '.mp4', '.mov', '.avi', '.webp', '.mp3', '.webm']:
+        if ext in ['.jpg', '.jpeg', '.png', '.gif', '.mp4', '.mov', '.avi', '.webp', '.mp3', '.webm', '.ogg', '.wav']:
             filename = f"{datetime.utcnow().timestamp():.0f}_{secure_filename(file.filename)}"
             file.save(os.path.join(folder, filename))
             return filename
@@ -119,6 +177,15 @@ def get_unread_count():
         msgs = Message.query.filter_by(receiver_id=current_user.id, is_read=False).count()
         return notifs + msgs
     return 0
+
+def get_user_status(user):
+    status = Status.query.filter_by(user_id=user.id).first()
+    if status:
+        return f"{status.emoji} {status.text}"
+    return ''
+
+# Регистрируем фильтр для Jinja2
+app.jinja_env.globals['get_user_status'] = get_user_status
 
 # ========== ROUTES ==========
 
@@ -241,17 +308,45 @@ def search():
 @login_required
 def create_post():
     content = request.form.get('content', '')
+    is_poll = request.form.get('is_poll') == '1'
+    poll_options_str = request.form.get('poll_options', '')
     images = request.files.getlist('images')
     hashtags = extract_hashtags(content)
-    post = Post(content=content, user_id=current_user.id, hashtags=hashtags)
+    
+    post = Post(content=content, user_id=current_user.id, hashtags=hashtags, is_poll=is_poll)
+    if is_poll:
+        post.poll_options = poll_options_str
+        post.poll_votes = json.dumps({i: 0 for i in range(len(poll_options_str.split(',')))})
+    
     db.session.add(post)
     db.session.flush()
+    
     for img in images:
         filename = save_file(img, app.config['UPLOAD_FOLDER'])
         if filename:
             db.session.add(PostImage(post_id=post.id, filename=filename))
+    
     db.session.commit()
     return redirect(url_for('recommendations'))
+
+@app.route('/vote/<int:post_id>/<int:option_index>', methods=['POST'])
+@login_required
+def vote(post_id, option_index):
+    post = Post.query.get_or_404(post_id)
+    if not post.is_poll:
+        return jsonify({'error': 'Not a poll'}), 400
+    
+    existing = PollVote.query.filter_by(user_id=current_user.id, post_id=post_id).first()
+    if existing:
+        return jsonify({'error': 'Already voted'}), 400
+    
+    votes = json.loads(post.poll_votes)
+    votes[str(option_index)] = votes.get(str(option_index), 0) + 1
+    post.poll_votes = json.dumps(votes)
+    
+    db.session.add(PollVote(user_id=current_user.id, post_id=post_id, option_index=option_index))
+    db.session.commit()
+    return jsonify({'status': 'ok', 'votes': votes})
 
 @app.route('/create_story', methods=['POST'])
 @login_required
@@ -287,7 +382,6 @@ def comment(post_id):
 @app.route('/like/<int:post_id>', methods=['POST'])
 @login_required
 def like(post_id):
-    post = Post.query.get_or_404(post_id)
     existing = Like.query.filter_by(user_id=current_user.id, post_id=post_id).first()
     if existing:
         db.session.delete(existing)
@@ -318,7 +412,8 @@ def user_page(user_id):
     followers_count = Follow.query.filter_by(followed_id=user.id).count()
     following_count = Follow.query.filter_by(follower_id=user.id).count()
     is_following = Follow.query.filter_by(follower_id=current_user.id, followed_id=user.id).first() is not None
-    return render_template('user_page.html', user=user, posts=posts, followers_count=followers_count, following_count=following_count, is_following=is_following, unread_count=get_unread_count())
+    gifts = Gift.query.filter_by(receiver_id=user.id).order_by(Gift.created_at.desc()).limit(10).all()
+    return render_template('user_page.html', user=user, posts=posts, followers_count=followers_count, following_count=following_count, is_following=is_following, gifts=gifts, unread_count=get_unread_count())
 
 @app.route('/profile')
 @login_required
@@ -326,7 +421,8 @@ def profile():
     posts = Post.query.filter_by(user_id=current_user.id).order_by(Post.created_at.desc()).all()
     followers_count = Follow.query.filter_by(followed_id=current_user.id).count()
     following_count = Follow.query.filter_by(follower_id=current_user.id).count()
-    return render_template('profile.html', user=current_user, posts=posts, followers_count=followers_count, following_count=following_count, unread_count=get_unread_count())
+    gifts = Gift.query.filter_by(receiver_id=current_user.id).order_by(Gift.created_at.desc()).limit(10).all()
+    return render_template('profile.html', user=current_user, posts=posts, followers_count=followers_count, following_count=following_count, gifts=gifts, unread_count=get_unread_count())
 
 @app.route('/update_profile', methods=['POST'])
 @login_required
@@ -339,6 +435,42 @@ def update_profile():
             current_user.avatar = filename
     db.session.commit()
     return redirect(url_for('profile'))
+
+@app.route('/set_status', methods=['POST'])
+@login_required
+def set_status():
+    status = Status.query.filter_by(user_id=current_user.id).first()
+    if not status:
+        status = Status(user_id=current_user.id)
+        db.session.add(status)
+    status.text = request.form.get('text', '')
+    status.emoji = request.form.get('emoji', '💬')
+    status.updated_at = datetime.utcnow()
+    db.session.commit()
+    return redirect(request.referrer or url_for('profile'))
+
+@app.route('/send_gift/<int:receiver_id>', methods=['POST'])
+@login_required
+def send_gift(receiver_id):
+    gift_type = request.form.get('gift_type', '❤️')
+    message = request.form.get('message', '')
+    cost = 10
+    
+    if current_user.coins < cost:
+        return jsonify({'error': 'Недостаточно монет'}), 400
+    
+    current_user.coins -= cost
+    receiver = User.query.get(receiver_id)
+    receiver.coins += cost
+    
+    gift = Gift(sender_id=current_user.id, receiver_id=receiver_id, gift_type=gift_type, message=message)
+    db.session.add(gift)
+    
+    notif = Notification(user_id=receiver_id, from_user_id=current_user.id, type='gift')
+    db.session.add(notif)
+    
+    db.session.commit()
+    return jsonify({'status': 'ok', 'coins': current_user.coins})
 
 @app.route('/notifications')
 @login_required
@@ -358,6 +490,69 @@ def mark_read():
     db.session.commit()
     return jsonify({'status': 'ok'})
 
+@app.route('/rating')
+@login_required
+def rating():
+    # Топ по подписчикам
+    top_users = db.session.query(User, db.func.count(Follow.followed_id).label('cnt'))\
+        .join(Follow, Follow.followed_id == User.id)\
+        .group_by(User.id)\
+        .order_by(db.text('cnt DESC'))\
+        .limit(50).all()
+    return render_template('rating.html', top_users=top_users, unread_count=get_unread_count())
+
+@app.route('/groups')
+@login_required
+def groups():
+    user_groups = Group.query.filter(Group.members.any(user_id=current_user.id)).all()
+    all_groups = Group.query.all()
+    return render_template('groups.html', user_groups=user_groups, all_groups=all_groups, unread_count=get_unread_count())
+
+@app.route('/create_group', methods=['POST'])
+@login_required
+def create_group():
+    name = request.form.get('name', '').strip()
+    description = request.form.get('description', '')
+    if name:
+        group = Group(name=name, description=description, creator_id=current_user.id)
+        db.session.add(group)
+        db.session.flush()
+        db.session.add(GroupMember(group_id=group.id, user_id=current_user.id, role='admin'))
+        db.session.commit()
+    return redirect(url_for('groups'))
+
+@app.route('/group/<int:group_id>')
+@login_required
+def group_page(group_id):
+    group = Group.query.get_or_404(group_id)
+    posts = GroupPost.query.filter_by(group_id=group_id).order_by(GroupPost.created_at.desc()).all()
+    is_member = GroupMember.query.filter_by(group_id=group_id, user_id=current_user.id).first() is not None
+    return render_template('group_page.html', group=group, posts=posts, is_member=is_member, unread_count=get_unread_count())
+
+@app.route('/join_group/<int:group_id>', methods=['POST'])
+@login_required
+def join_group(group_id):
+    if not GroupMember.query.filter_by(group_id=group_id, user_id=current_user.id).first():
+        db.session.add(GroupMember(group_id=group_id, user_id=current_user.id))
+        db.session.commit()
+    return redirect(url_for('group_page', group_id=group_id))
+
+@app.route('/leave_group/<int:group_id>', methods=['POST'])
+@login_required
+def leave_group(group_id):
+    GroupMember.query.filter_by(group_id=group_id, user_id=current_user.id).delete()
+    db.session.commit()
+    return redirect(url_for('groups'))
+
+@app.route('/group_post/<int:group_id>', methods=['POST'])
+@login_required
+def group_post(group_id):
+    content = request.form.get('content', '')
+    if content:
+        db.session.add(GroupPost(group_id=group_id, user_id=current_user.id, content=content))
+        db.session.commit()
+    return redirect(url_for('group_page', group_id=group_id))
+
 @app.route('/games')
 @login_required
 def games():
@@ -366,7 +561,18 @@ def games():
 @app.route('/music')
 @login_required
 def music():
-    return render_template('music.html', music_files=[], unread_count=get_unread_count())
+    music_files = []
+    if os.path.exists('static/music'):
+        music_files = [f for f in os.listdir('static/music') if f.endswith('.mp3')]
+    return render_template('music.html', music_files=music_files, unread_count=get_unread_count())
+
+@app.route('/upload_music', methods=['POST'])
+@login_required
+def upload_music():
+    file = request.files.get('music')
+    if file:
+        save_file(file, 'static/music')
+    return redirect(url_for('music'))
 
 @app.route('/bookmarks')
 @login_required
