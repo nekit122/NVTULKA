@@ -1,0 +1,15 @@
+{% extends "base.html" %}
+{% block title %}Просмотры - NVTULKA{% endblock %}
+{% block header %}NVTULKA{% endblock %}
+{% block content %}
+<h3>👀 Кто заходил в профиль</h3>
+{% for view in views %}
+<div class="card" style="display: flex; align-items: center; gap: 12px;">
+    <img src="/static/avatars/{{ view.viewer.avatar }}" class="avatar">
+    <a href="/user/{{ view.viewer.id }}" class="username-link">{{ view.viewer.username }}</a>
+    <div style="margin-left: auto; font-size: 12px; color: var(--text-secondary);">
+        {{ view.viewed_at.strftime('%d.%m.%Y %H:%M') }}
+    </div>
+</div>
+{% endfor %}
+{% endblock %}

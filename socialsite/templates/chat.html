@@ -1,0 +1,39 @@
+{% extends "base.html" %}
+{% block title %}Чат - NVTULKA{% endblock %}
+{% block header %}💬 <a href="/user/{{ friend.id }}" style="color: #fff;">{{ friend.username }}</a>{% endblock %}
+{% block content %}
+<div style="display: flex; flex-direction: column; height: calc(100vh - 180px);">
+    <div id="messages" style="flex: 1; overflow-y: auto; margin-bottom: 10px;">
+        {% for msg in messages %}
+        <div style="margin: 6px 0; {% if msg.sender_id == current_user.id %}text-align: right;{% endif %}">
+            <span style="background: {% if msg.sender_id == current_user.id %}var(--btn-primary){% else %}var(--btn-gray){% endif %}; {% if msg.sender_id == current_user.id %}color: #fff;{% endif %} padding: 8px 12px; border-radius: 12px; display: inline-block; max-width: 70%;">
+                {{ msg.content }}
+            </span>
+            <div style="font-size: 10px; color: var(--text-secondary);">{{ msg.timestamp.strftime('%H:%M') }}</div>
+        </div>
+        {% endfor %}
+    </div>
+    <div style="display: flex; gap: 8px;">
+        <input type="text" id="msgInput" placeholder="Сообщение..." style="flex: 1;">
+        <button onclick="sendMessage()" class="btn" style="border-radius: 20px;">➤</button>
+    </div>
+</div>
+<script>
+function sendMessage() {
+    const input = document.getElementById('msgInput');
+    const content = input.value.trim();
+    if (!content) return;
+    fetch('/send_message/{{ friend.id }}', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ content: content })
+    }).then(r => r.json()).then(data => {
+        if (data.status === 'ok') location.reload();
+    });
+    input.value = '';
+}
+document.getElementById('msgInput').addEventListener('keydown', function(e) {
+    if (e.key === 'Enter') sendMessage();
+});
+</script>
+{% endblock %}

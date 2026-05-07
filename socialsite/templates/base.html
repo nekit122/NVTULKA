@@ -1,0 +1,325 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{% block title %}NVTULKA{% endblock %}</title>
+    <style>
+        :root {
+            --bg: #edeef0;
+            --card-bg: #fff;
+            --text: #222;
+            --text-secondary: #888;
+            --link: #4a76a8;
+            --header-bg: #4a76a8;
+            --header-text: #fff;
+            --border: #ddd;
+            --btn-primary: #4a76a8;
+            --btn-hover: #3a5f8a;
+            --btn-gray: #e5e7eb;
+            --input-bg: #fff;
+        }
+        
+        .dark-theme {
+            --bg: #1a1a2e;
+            --card-bg: #16213e;
+            --text: #eee;
+            --text-secondary: #aaa;
+            --link: #7eb8ff;
+            --header-bg: #0f3460;
+            --border: #333;
+            --btn-gray: #333;
+            --input-bg: #0f3460;
+        }
+        
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { 
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; 
+            background: var(--bg); 
+            color: var(--text); 
+            padding-bottom: 70px;
+            transition: all 0.3s;
+        }
+        
+        .header { 
+            background: var(--header-bg); 
+            color: var(--header-text); 
+            padding: 12px 16px; 
+            display: flex; 
+            justify-content: space-between; 
+            align-items: center; 
+            font-weight: bold; 
+            font-size: 18px; 
+            position: sticky;
+            top: 0;
+            z-index: 100;
+        }
+        .header-left { display: flex; align-items: center; gap: 10px; }
+        .site-name { font-size: 20px; letter-spacing: 2px; }
+        .bell-container { position: relative; cursor: pointer; font-size: 24px; }
+        .bell-badge { 
+            position: absolute; 
+            top: -5px; 
+            right: -5px; 
+            background: #e74c3c; 
+            color: #fff; 
+            font-size: 11px; 
+            padding: 2px 6px; 
+            border-radius: 10px; 
+            font-weight: bold;
+            display: none;
+        }
+        .bell-badge.show { display: block; }
+        
+        .notif-dropdown {
+            display: none;
+            position: absolute;
+            top: 50px;
+            right: 10px;
+            width: 350px;
+            max-height: 400px;
+            background: var(--card-bg);
+            border-radius: 8px;
+            box-shadow: 0 5px 20px rgba(0,0,0,0.3);
+            z-index: 1000;
+            overflow-y: auto;
+            color: var(--text);
+            font-size: 14px;
+            font-weight: normal;
+        }
+        .notif-dropdown.open { display: block; }
+        .notif-item {
+            padding: 12px 16px;
+            border-bottom: 1px solid var(--border);
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 10px;
+        }
+        
+        .container { max-width: 700px; margin: 0 auto; padding: 10px; }
+        .card { background: var(--card-bg); border-radius: 8px; padding: 15px; margin-bottom: 12px; box-shadow: 0 1px 3px rgba(0,0,0,0.1); }
+        .btn { background: var(--btn-primary); color: #fff; border: none; padding: 8px 16px; border-radius: 6px; cursor: pointer; text-decoration: none; display: inline-block; font-size: 14px; }
+        .btn:hover { background: var(--btn-hover); }
+        .btn-gray { background: var(--btn-gray); color: var(--text); }
+        .username-link { color: var(--link); text-decoration: none; font-weight: bold; }
+        .username-link:hover { text-decoration: underline; }
+        .avatar { width: 40px; height: 40px; border-radius: 50%; object-fit: cover; }
+        .avatar-sm { width: 32px; height: 32px; border-radius: 50%; object-fit: cover; }
+        
+        .bottom-nav { position: fixed; bottom: 0; left: 0; right: 0; background: var(--card-bg); display: flex; justify-content: space-around; align-items: center; border-top: 1px solid var(--border); z-index: 999; height: 60px; }
+        .bottom-nav a { text-decoration: none; color: var(--text-secondary); font-size: 12px; text-align: center; flex: 1; padding: 8px 0; }
+        .bottom-nav a.active { color: var(--link); }
+        .bottom-nav .icon { font-size: 22px; display: block; }
+        
+        .side-menu { position: fixed; left: -300px; top: 0; width: 280px; height: 100%; background: var(--card-bg); transition: left 0.3s; z-index: 1001; box-shadow: 2px 0 10px rgba(0,0,0,0.2); overflow-y: auto; color: var(--text); }
+        .side-menu.open { left: 0; }
+        .side-menu .menu-header { background: var(--header-bg); color: #fff; padding: 20px; text-align: center; }
+        .side-menu a { display: block; padding: 14px 20px; border-bottom: 1px solid var(--border); text-decoration: none; color: var(--text); }
+        .overlay { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.4); z-index: 1000; }
+        .overlay.show { display: block; }
+        
+        .modal { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.5); z-index: 1002; justify-content: center; align-items: center; }
+        .modal.active { display: flex; }
+        .modal-content { background: var(--card-bg); padding: 20px; border-radius: 8px; width: 90%; max-width: 500px; color: var(--text); }
+        textarea, input[type="text"], input[type="email"], input[type="password"] { 
+            width: 100%; padding: 10px; border: 1px solid var(--border); border-radius: 6px; 
+            background: var(--input-bg); color: var(--text); margin: 5px 0; 
+        }
+        
+        .stats { display: flex; justify-content: center; gap: 30px; margin: 20px 0; flex-wrap: wrap; }
+        .stat-item { text-align: center; }
+        .stat-item strong { display: block; font-size: 20px; }
+        .stat-item span { color: var(--text-secondary); font-size: 13px; }
+        .actions { display: flex; gap: 10px; justify-content: center; flex-wrap: wrap; }
+        
+        .tabs { display: flex; gap: 10px; margin-bottom: 15px; }
+        .tab { padding: 8px 16px; border-radius: 20px; background: var(--btn-gray); color: var(--text); text-decoration: none; }
+        .tab.active { background: var(--btn-primary); color: #fff; }
+        
+        .tag { display: inline-block; background: var(--btn-primary); color: #fff; padding: 4px 10px; border-radius: 12px; font-size: 13px; margin: 2px; text-decoration: none; }
+        
+        .comment-section { margin-top: 10px; border-top: 1px solid var(--border); padding-top: 10px; }
+        .comment { padding: 8px 0; border-bottom: 1px solid var(--border); }
+    </style>
+</head>
+<body>
+    <div class="header">
+        <div class="header-left">
+            <span class="site-name">NVTULKA</span>
+        </div>
+        <div class="bell-container" onclick="toggleNotifications()">
+            🔔
+            <span class="bell-badge {% if unread_count and unread_count > 0 %}show{% endif %}" id="bellBadge">
+                {{ unread_count if unread_count else '' }}
+            </span>
+            <div class="notif-dropdown" id="notifDropdown">
+                <div style="padding: 12px 16px; font-weight: bold; border-bottom: 1px solid var(--border);">
+                    Уведомления
+                    <a href="/notifications" style="float: right; font-size: 12px; color: var(--link);">Все</a>
+                </div>
+                <div id="notifList">
+                    <div style="padding: 20px; text-align: center;">Загрузка...</div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="overlay" id="overlay" onclick="closeMenu()"></div>
+    <div class="side-menu" id="sideMenu">
+        <div class="menu-header">
+            <strong>{{ current_user.username if current_user.is_authenticated else 'Гость' }}</strong>
+        </div>
+        <a href="/profile">👤 Мой профиль</a>
+        <a href="/friends">👥 Друзья</a>
+        <a href="/feed">📰 Моя лента</a>
+        <a href="/recommendations">🌍 Рекомендации</a>
+        <a href="/search">🔍 Поиск</a>
+        <a href="/bookmarks">⭐ Закладки</a>
+        <a href="/trends">📈 Тренды</a>
+        <a href="/profile_views">👀 Кто заходил</a>
+        <a href="#" onclick="toggleTheme()">🌓 Тёмная тема</a>
+        <a href="/logout">🚪 Выйти</a>
+    </div>
+
+    <div class="container">
+        {% block content %}{% endblock %}
+    </div>
+
+    <nav class="bottom-nav">
+        <a href="#" onclick="toggleMenu()"><span class="icon">☰</span>Меню</a>
+        <a href="/friends"><span class="icon">👥</span>Друзья</a>
+        <a href="/feed"><span class="icon">📰</span>Лента</a>
+        <a href="/search"><span class="icon">🔍</span>Поиск</a>
+        <a href="#" onclick="document.getElementById('postModal').classList.add('active')"><span class="icon">✏️</span>Пост</a>
+    </nav>
+
+    <div class="modal" id="postModal">
+        <div class="modal-content">
+            <h3>Новый пост</h3>
+            <form action="/create_post" method="post" enctype="multipart/form-data">
+                <textarea name="content" placeholder="Что у вас нового? #хештеги работают!" required></textarea><br>
+                <input type="file" name="images" accept="image/*,video/*" multiple><br><br>
+                <button type="submit" class="btn">Опубликовать</button>
+                <button type="button" class="btn btn-gray" onclick="document.getElementById('postModal').classList.remove('active')">Отмена</button>
+            </form>
+        </div>
+    </div>
+
+    <script>
+        function toggleMenu() {
+            document.getElementById('sideMenu').classList.toggle('open');
+            document.getElementById('overlay').classList.toggle('show');
+        }
+        function closeMenu() {
+            document.getElementById('sideMenu').classList.remove('open');
+            document.getElementById('overlay').classList.remove('show');
+        }
+        
+        function toggleTheme() {
+            document.body.classList.toggle('dark-theme');
+            localStorage.setItem('theme', document.body.classList.contains('dark-theme') ? 'dark' : 'light');
+            closeMenu();
+        }
+        
+        if (localStorage.getItem('theme') === 'dark') {
+            document.body.classList.add('dark-theme');
+        }
+        
+        function toggleNotifications() {
+            const dropdown = document.getElementById('notifDropdown');
+            dropdown.classList.toggle('open');
+            if (dropdown.classList.contains('open')) {
+                loadNotifications();
+                markAsRead();
+            }
+        }
+        
+        function loadNotifications() {
+            fetch('/notifications')
+                .then(r => r.text())
+                .then(html => {
+                    const parser = new DOMParser();
+                    const doc = parser.parseFromString(html, 'text/html');
+                    const items = doc.querySelectorAll('.notif-item');
+                    const list = document.getElementById('notifList');
+                    if (items.length === 0) {
+                        list.innerHTML = '<div style="padding: 20px; text-align: center;">Нет уведомлений</div>';
+                    } else {
+                        list.innerHTML = '';
+                        items.forEach(item => list.appendChild(item.cloneNode(true)));
+                    }
+                });
+        }
+        
+        function markAsRead() {
+            fetch('/notifications/read', { method: 'POST' });
+            document.getElementById('bellBadge').classList.remove('show');
+        }
+        
+        function followUser(userId, btn) {
+            fetch('/follow/' + userId, { method: 'POST' })
+                .then(r => r.json())
+                .then(data => {
+                    if (data.status === 'followed') {
+                        btn.textContent = 'Отписаться';
+                        btn.className = 'btn btn-gray';
+                    } else if (data.status === 'unfollowed') {
+                        btn.textContent = 'Подписаться';
+                        btn.className = 'btn';
+                    }
+                });
+        }
+        
+        function followFromNotif(userId, btn) {
+            fetch('/follow/' + userId, { method: 'POST' })
+                .then(r => r.json())
+                .then(data => {
+                    if (data.status === 'followed') {
+                        btn.textContent = '✓ Подписаны';
+                        btn.className = 'btn-small btn-unfollow';
+                    }
+                });
+        }
+        
+        function likePost(postId, btn) {
+            fetch('/like/' + postId, { method: 'POST' })
+                .then(r => r.json())
+                .then(data => {
+                    btn.innerHTML = '❤️ ' + data.likes;
+                });
+        }
+        
+        function bookmarkPost(postId, btn) {
+            fetch('/bookmark/' + postId, { method: 'POST' })
+                .then(r => r.json())
+                .then(data => {
+                    btn.textContent = data.status === 'bookmarked' ? '⭐' : '☆';
+                });
+        }
+        
+        setInterval(() => {
+            fetch('/notifications/unread-count')
+                .then(r => r.json())
+                .then(data => {
+                    const badge = document.getElementById('bellBadge');
+                    if (data.count > 0) {
+                        badge.textContent = data.count;
+                        badge.classList.add('show');
+                    } else {
+                        badge.textContent = '';
+                        badge.classList.remove('show');
+                    }
+                });
+        }, 10000);
+        
+        document.addEventListener('click', function(e) {
+            const container = document.querySelector('.bell-container');
+            if (container && !container.contains(e.target)) {
+                document.getElementById('notifDropdown').classList.remove('open');
+            }
+        });
+    </script>
+    {% block scripts %}{% endblock %}
+</body>
+</html>

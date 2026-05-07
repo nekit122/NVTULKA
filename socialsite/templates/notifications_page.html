@@ -1,0 +1,23 @@
+{% extends "base.html" %}
+{% block title %}Уведомления - NVTULKA{% endblock %}
+{% block header %}NVTULKA{% endblock %}
+{% block content %}
+<h3>🔔 Уведомления</h3>
+{% for notif in notifications %}
+<div class="card" style="display: flex; align-items: center; justify-content: space-between;">
+    <div>
+        <img src="/static/avatars/{{ notif.from_user.avatar }}" class="avatar-sm" style="vertical-align: middle;">
+        <a href="/user/{{ notif.from_user.id }}" class="username-link">{{ notif.from_user.username }}</a>
+        {% if notif.type == 'follow' %}подписался на вас
+        {% elif notif.type == 'like' %}оценил ваш пост
+        {% elif notif.type == 'comment' %}прокомментировал ваш пост
+        {% elif notif.type == 'repost' %}сделал репост
+        {% endif %}
+        <div style="font-size: 11px; color: var(--text-secondary);">{{ notif.created_at.strftime('%d.%m.%Y %H:%M') }}</div>
+    </div>
+    {% if notif.type == 'follow' %}
+        <button class="btn btn-gray" onclick="followFromNotif({{ notif.from_user_id }}, this)">Подписаться</button>
+    {% endif %}
+</div>
+{% endfor %}
+{% endblock %}

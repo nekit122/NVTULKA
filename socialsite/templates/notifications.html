@@ -1,0 +1,13 @@
+{% for notif in notifications[:10] %}
+<div class="notif-item">
+    <div>
+        <img src="/static/avatars/{{ notif.from_user.avatar }}" class="avatar-sm" style="vertical-align: middle;">
+        <a href="/user/{{ notif.from_user.id }}" class="username-link">{{ notif.from_user.username }}</a>
+        {% if notif.type == 'follow' %}подписался
+        {% elif notif.type == 'like' %}лайкнул
+        {% elif notif.type == 'comment' %}прокомментировал
+        {% elif notif.type == 'repost' %}репостнул
+        {% endif %}
+    </div>
+</div>
+{% endfor %}

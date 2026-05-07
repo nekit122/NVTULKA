@@ -1,0 +1,13 @@
+{% extends "base.html" %}
+{% block title %}Тренды - NVTULKA{% endblock %}
+{% block header %}NVTULKA{% endblock %}
+{% block content %}
+<h3>📈 Популярные хештеги</h3>
+<div style="display: flex; flex-wrap: wrap; gap: 10px;">
+    {% for tag, count in tags %}
+    <a href="/search?q=%23{{ tag }}" class="tag" style="font-size: {% if count > 10 %}20px{% elif count > 5 %}16px{% else %}14px{% endif %};">
+        #{{ tag }} ({{ count }})
+    </a>
+    {% endfor %}
+</div>
+{% endblock %}

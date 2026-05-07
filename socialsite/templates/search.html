@@ -1,0 +1,34 @@
+{% extends "base.html" %}
+{% block title %}Поиск - NVTULKA{% endblock %}
+{% block header %}🔍 Поиск{% endblock %}
+{% block content %}
+<form method="get" action="/search" style="margin-bottom: 20px;">
+    <input type="text" name="q" value="{{ query }}" placeholder="Поиск людей, постов или #хештегов..." style="font-size: 16px;">
+</form>
+{% if query %}
+    {% if users %}
+    <h3>Люди</h3>
+    {% for u in users %}
+    <div class="card" style="display: flex; align-items: center; gap: 12px;">
+        <img src="/static/avatars/{{ u.avatar }}" class="avatar">
+        <a href="/user/{{ u.id }}" class="username-link">{{ u.username }}</a>
+        <button onclick="followUser({{ u.id }}, this)" class="btn" style="margin-left: auto;">Подписаться</button>
+    </div>
+    {% endfor %}
+    {% endif %}
+    
+    {% if posts or tag_posts %}
+    <h3>Посты</h3>
+    {% for p in (posts or tag_posts) %}
+    <div class="card">
+        <a href="/user/{{ p.author.id }}" class="username-link">{{ p.author.username }}</a>
+        <p>{{ p.content[:200] }}</p>
+    </div>
+    {% endfor %}
+    {% endif %}
+    
+    {% if not users and not posts and not tag_posts %}
+    <p style="text-align: center;">Ничего не найдено</p>
+    {% endif %}
+{% endif %}
+{% endblock %}

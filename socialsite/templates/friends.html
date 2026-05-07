@@ -1,0 +1,16 @@
+{% extends "base.html" %}
+{% block title %}Друзья - NVTULKA{% endblock %}
+{% block header %}👥 Друзья{% endblock %}
+{% block content %}
+{% if friends %}
+    {% for friend in friends %}
+    <div class="card" style="display: flex; align-items: center; gap: 12px;">
+        <img src="/static/avatars/{{ friend.avatar }}" class="avatar">
+        <a href="/user/{{ friend.id }}" class="username-link">{{ friend.username }}</a>
+        <a href="/chat/{{ friend.id }}" class="btn" style="margin-left: auto;">💬 Чат</a>
+    </div>
+    {% endfor %}
+{% else %}
+    <div class="card" style="text-align: center;">Нет друзей. Найдите их через поиск!</div>
+{% endif %}
+{% endblock %}

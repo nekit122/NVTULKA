@@ -1,0 +1,50 @@
+{% extends "base.html" %}
+{% block title %}{{ user.username }} - NVTULKA{% endblock %}
+{% block header %}NVTULKA{% endblock %}
+{% block content %}
+<div class="card" style="text-align: center;">
+    <img src="/static/avatars/{{ user.avatar }}" class="avatar" style="width: 80px; height: 80px;">
+    <h2>{{ user.username }}</h2>
+    <p>{{ user.bio or 'Био пока нет' }}</p>
+    <div class="stats">
+        <div class="stat-item"><strong>{{ posts|length }}</strong><span>постов</span></div>
+        <div class="stat-item"><strong>{{ followers_count }}</strong><span>подписчиков</span></div>
+        <div class="stat-item"><strong>{{ following_count }}</strong><span>подписок</span></div>
+        <div class="stat-item"><strong>{{ likes_count }}</strong><span>лайков</span></div>
+        <div class="stat-item"><strong>{{ profile_views }}</strong><span>просмотров</span></div>
+    </div>
+    <div class="actions">
+        {% if user.id != current_user.id %}
+            <button onclick="followUser({{ user.id }}, this)" class="btn {% if is_following %}btn-gray{% endif %}">
+                {{ 'Отписаться' if is_following else 'Подписаться' }}
+            </button>
+            {% if is_mutual %}
+                <a href="/chat/{{ user.id }}" class="btn">💬 Чат</a>
+            {% endif %}
+        {% endif %}
+    </div>
+</div>
+
+<h3>Посты</h3>
+{% for post in posts %}
+<div class="card">
+    {% if post.is_pinned %}<div style="color: var(--link); font-weight: bold;">📌</div>{% endif %}
+    <p>{{ post.content }}</p>
+    {% if post.hashtags %}
+    <div>
+        {% for tag in post.hashtags.split(',') %}
+            {% if tag %}<a href="/search?q=%23{{ tag }}" class="tag">#{{ tag }}</a>{% endif %}
+        {% endfor %}
+    </div>
+    {% endif %}
+    {% if post.images %}
+    <div style="display: flex; gap: 5px; flex-wrap: wrap;">
+        {% for img in post.images %}
+            <img src="/static/uploads/{{ img.filename }}" style="max-width: 100%; max-height: 300px; border-radius: 8px;">
+        {% endfor %}
+    </div>
+    {% endif %}
+    <button onclick="likePost({{ post.id }}, this)" class="btn btn-gray" style="margin-top: 10px;">❤️ {{ post.likes|length }}</button>
+</div>
+{% endfor %}
+{% endblock %}

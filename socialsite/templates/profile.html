@@ -1,0 +1,50 @@
+{% extends "base.html" %}
+{% block title %}Профиль - NVTULKA{% endblock %}
+{% block header %}NVTULKA{% endblock %}
+{% block content %}
+<div class="card" style="text-align: center;">
+    <img src="/static/avatars/{{ user.avatar }}" class="avatar" style="width: 80px; height: 80px;">
+    <h2>{{ user.username }}</h2>
+    <p>{{ user.bio or 'Био пока нет' }}</p>
+    <div class="stats">
+        <div class="stat-item"><strong>{{ posts|length }}</strong><span>постов</span></div>
+        <div class="stat-item"><strong>{{ followers_count }}</strong><span>подписчиков</span></div>
+        <div class="stat-item"><strong>{{ following_count }}</strong><span>подписок</span></div>
+        <div class="stat-item"><strong>{{ profile_views }}</strong><span>просмотров</span></div>
+    </div>
+    <button onclick="document.getElementById('editProfileModal').classList.add('active')" class="btn btn-gray">Редактировать профиль</button>
+</div>
+
+<div class="modal" id="editProfileModal">
+    <div class="modal-content">
+        <h3>Редактировать профиль</h3>
+        <form action="/update_profile" method="post" enctype="multipart/form-data">
+            <label>Аватар</label>
+            <input type="file" name="avatar" accept="image/*"><br>
+            <label>Био</label>
+            <textarea name="bio" maxlength="300">{{ user.bio or '' }}</textarea><br>
+            <button type="submit" class="btn">Сохранить</button>
+            <button type="button" class="btn btn-gray" onclick="document.getElementById('editProfileModal').classList.remove('active')">Отмена</button>
+        </form>
+    </div>
+</div>
+
+<h3>Мои посты</h3>
+{% for post in posts %}
+<div class="card">
+    {% if post.is_pinned %}<div style="color: var(--link); font-weight: bold;">📌 Закреплённый пост</div>{% endif %}
+    <p>{{ post.content }}</p>
+    {% if post.images %}
+    <div style="display: flex; gap: 5px; flex-wrap: wrap;">
+        {% for img in post.images %}
+            <img src="/static/uploads/{{ img.filename }}" style="max-width: 100%; max-height: 300px; border-radius: 8px;">
+        {% endfor %}
+    </div>
+    {% endif %}
+    <div style="display: flex; gap: 10px; margin-top: 10px;">
+        <form action="/pin_post/{{ post.id }}" method="post"><button class="btn btn-gray">📌</button></form>
+        <form action="/delete_post/{{ post.id }}" method="post" onsubmit="return confirm('Удалить?');"><button class="btn btn-gray">🗑️</button></form>
+    </div>
+</div>
+{% endfor %}
+{% endblock %}
