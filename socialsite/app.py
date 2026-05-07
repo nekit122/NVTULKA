@@ -32,11 +32,12 @@ class User(UserMixin, db.Model):
     password_hash = db.Column(db.String(200), nullable=False)
     avatar = db.Column(db.String(200), default='default.png')
     bio = db.Column(db.String(300), default='')
-    coins = db.Column(db.Integer, default=100)
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
     posts = db.relationship('Post', backref='author', lazy=True)
     stories = db.relationship('Story', backref='user', lazy=True)
     status = db.relationship('Status', backref='user', uselist=False, lazy=True)
+    sent_gifts = db.relationship('Gift', backref='sender', lazy=True, foreign_keys='Gift.sender_id')
+    received_gifts = db.relationship('Gift', backref='receiver', lazy=True, foreign_keys='Gift.receiver_id')
 
 class Status(db.Model):
     id = db.Column(db.Integer, primary_key=True)
@@ -154,14 +155,6 @@ def load_user(user_id):
 def extract_hashtags(text):
     return ','.join(re.findall(r'#(\w+)', text))
 
-def extract_mentions(text):
-    mentions = re.findall(r'@(\w+)', text)
-    for mention in mentions:
-        user = User.query.filter_by(username=mention).first()
-        if user:
-            text = text.replace(f'@{mention}', f'<a href="/user/{user.id}" style="color: var(--link); font-weight: bold;">@{mention}</a>')
-    return text
-
 def save_file(file, folder):
     if file and file.filename:
         ext = os.path.splitext(file.filename)[1].lower()
@@ -180,11 +173,10 @@ def get_unread_count():
 
 def get_user_status(user):
     status = Status.query.filter_by(user_id=user.id).first()
-    if status:
+    if status and status.text:
         return f"{status.emoji} {status.text}"
     return ''
 
-# Регистрируем фильтр для Jinja2
 app.jinja_env.globals['get_user_status'] = get_user_status
 
 # ========== ROUTES ==========
@@ -314,9 +306,10 @@ def create_post():
     hashtags = extract_hashtags(content)
     
     post = Post(content=content, user_id=current_user.id, hashtags=hashtags, is_poll=is_poll)
-    if is_poll:
+    if is_poll and poll_options_str:
         post.poll_options = poll_options_str
-        post.poll_votes = json.dumps({i: 0 for i in range(len(poll_options_str.split(',')))})
+        options_list = [o.strip() for o in poll_options_str.split(',') if o.strip()]
+        post.poll_votes = json.dumps({str(i): 0 for i in range(len(options_list))})
     
     db.session.add(post)
     db.session.flush()
@@ -340,7 +333,7 @@ def vote(post_id, option_index):
     if existing:
         return jsonify({'error': 'Already voted'}), 400
     
-    votes = json.loads(post.poll_votes)
+    votes = json.loads(post.poll_votes or '{}')
     votes[str(option_index)] = votes.get(str(option_index), 0) + 1
     post.poll_votes = json.dumps(votes)
     
@@ -454,23 +447,10 @@ def set_status():
 def send_gift(receiver_id):
     gift_type = request.form.get('gift_type', '❤️')
     message = request.form.get('message', '')
-    cost = 10
-    
-    if current_user.coins < cost:
-        return jsonify({'error': 'Недостаточно монет'}), 400
-    
-    current_user.coins -= cost
-    receiver = User.query.get(receiver_id)
-    receiver.coins += cost
-    
     gift = Gift(sender_id=current_user.id, receiver_id=receiver_id, gift_type=gift_type, message=message)
     db.session.add(gift)
-    
-    notif = Notification(user_id=receiver_id, from_user_id=current_user.id, type='gift')
-    db.session.add(notif)
-    
     db.session.commit()
-    return jsonify({'status': 'ok', 'coins': current_user.coins})
+    return jsonify({'status': 'ok'})
 
 @app.route('/notifications')
 @login_required
@@ -493,7 +473,6 @@ def mark_read():
 @app.route('/rating')
 @login_required
 def rating():
-    # Топ по подписчикам
     top_users = db.session.query(User, db.func.count(Follow.followed_id).label('cnt'))\
         .join(Follow, Follow.followed_id == User.id)\
         .group_by(User.id)\
