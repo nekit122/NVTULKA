@@ -7,65 +7,87 @@
         {% for msg in messages %}
         <div style="margin: 6px 0; {% if msg.sender_id == current_user.id %}text-align: right;{% endif %}">
             <span style="background: {% if msg.sender_id == current_user.id %}var(--btn-primary){% else %}var(--btn-gray){% endif %}; {% if msg.sender_id == current_user.id %}color: #fff;{% endif %} padding: 8px 12px; border-radius: 12px; display: inline-block; max-width: 70%;">
-                {{ msg.content }}
+                {% if msg.content.startswith('[VOICE]') %}
+                    <audio controls style="max-width: 200px;"><source src="/static/uploads/{{ msg.content[7:] }}" type="audio/webm"></audio>
+                {% else %}
+                    {{ msg.content }}
+                {% endif %}
             </span>
             <div style="font-size: 10px; color: var(--text-secondary);">{{ msg.timestamp.strftime('%H:%M') }}</div>
         </div>
         {% endfor %}
     </div>
-    <div style="display: flex; gap: 8px;">
+    
+    <div style="display: flex; gap: 8px; align-items: center;">
+        <button id="recordBtn" onclick="toggleRecording()" class="btn btn-gray" style="border-radius: 50%; width: 40px; height: 40px; padding: 0;">🎤</button>
         <input type="text" id="msgInput" placeholder="Сообщение..." style="flex: 1; padding: 10px; border: 1px solid var(--border); border-radius: 20px; background: var(--input-bg); color: var(--text);">
         <button onclick="sendMessage()" class="btn" style="border-radius: 20px;">➤</button>
     </div>
 </div>
 
 <script>
+var mediaRecorder, audioChunks = [], isRecording = false;
+
+async function toggleRecording() {
+    if (!isRecording) {
+        var stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+        mediaRecorder = new MediaRecorder(stream);
+        audioChunks = [];
+        mediaRecorder.ondataavailable = function(e) { audioChunks.push(e.data); };
+        mediaRecorder.onstop = async function() {
+            var blob = new Blob(audioChunks, { type: 'audio/webm' });
+            var formData = new FormData();
+            formData.append('audio', blob);
+            formData.append('content', '[VOICE]');
+            await fetch('/send_voice/{{ friend.id }}', { method: 'POST', body: formData });
+            loadNewMessages();
+        };
+        mediaRecorder.start();
+        isRecording = true;
+        document.getElementById('recordBtn').style.background = '#e74c3c';
+        document.getElementById('recordBtn').textContent = '⏹';
+    } else {
+        mediaRecorder.stop();
+        isRecording = false;
+        document.getElementById('recordBtn').style.background = '';
+        document.getElementById('recordBtn').textContent = '🎤';
+    }
+}
+
 function sendMessage() {
-    const input = document.getElementById('msgInput');
-    const content = input.value.trim();
+    var input = document.getElementById('msgInput');
+    var content = input.value.trim();
     if (!content) return;
-    
     fetch('/send_message/{{ friend.id }}', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ content: content })
     })
-    .then(r => r.json())
-    .then(data => {
-        if (data.status === 'ok') {
-            input.value = '';
-            loadNewMessages();
-        }
+    .then(function(r) { return r.json(); })
+    .then(function(data) {
+        if (data.status === 'ok') { input.value = ''; loadNewMessages(); }
     });
 }
 
 function loadNewMessages() {
     fetch(window.location.href)
-        .then(r => r.text())
-        .then(html => {
-            const parser = new DOMParser();
-            const doc = parser.parseFromString(html, 'text/html');
-            const newMessages = doc.getElementById('messages');
+        .then(function(r) { return r.text(); })
+        .then(function(html) {
+            var parser = new DOMParser();
+            var doc = parser.parseFromString(html, 'text/html');
+            var newMessages = doc.getElementById('messages');
             if (newMessages) {
                 document.getElementById('messages').innerHTML = newMessages.innerHTML;
-                const container = document.getElementById('messages');
-                container.scrollTop = container.scrollHeight;
+                document.getElementById('messages').scrollTop = document.getElementById('messages').scrollHeight;
             }
         });
 }
 
 document.getElementById('msgInput').addEventListener('keydown', function(e) {
-    if (e.key === 'Enter') {
-        e.preventDefault();
-        sendMessage();
-    }
+    if (e.key === 'Enter') { e.preventDefault(); sendMessage(); }
 });
 
 setInterval(loadNewMessages, 2000);
-
-window.onload = function() {
-    const container = document.getElementById('messages');
-    container.scrollTop = container.scrollHeight;
-};
+window.onload = function() { document.getElementById('messages').scrollTop = document.getElementById('messages').scrollHeight; };
 </script>
 {% endblock %}
