@@ -9,31 +9,25 @@
     <button onclick="showGame('xo')" class="tab" id="tab-xo">❌ Крестики-нолики</button>
 </div>
 
-<!-- ЗМЕЙКА -->
 <div id="game-snake" class="game-container">
     <canvas id="snakeCanvas" width="400" height="400" style="border: 2px solid var(--border); background: #000;"></canvas>
     <p>Счёт: <span id="snakeScore">0</span></p>
     <button onclick="startSnake()" class="btn">Начать заново</button>
 </div>
 
-<!-- ТЕТРИС -->
 <div id="game-tetris" class="game-container" style="display: none;">
     <canvas id="tetrisCanvas" width="300" height="600" style="border: 2px solid var(--border); background: #000;"></canvas>
     <p>Счёт: <span id="tetrisScore">0</span></p>
     <button onclick="startTetris()" class="btn">Начать заново</button>
 </div>
 
-<!-- КРЕСТИКИ-НОЛИКИ -->
 <div id="game-xo" class="game-container" style="display: none;">
-    <div id="xoBoard" style="display: grid; grid-template-columns: repeat(3, 100px); gap: 5px; justify-content: center;">
-    </div>
+    <div id="xoBoard" style="display: grid; grid-template-columns: repeat(3, 100px); gap: 5px; justify-content: center;"></div>
     <p id="xoStatus" style="text-align: center; margin: 10px;"></p>
     <button onclick="startXO()" class="btn">Начать заново</button>
 </div>
 
-<style>
-.game-container { text-align: center; padding: 20px; }
-</style>
+<style>.game-container { text-align: center; padding: 20px; }</style>
 
 <script>
 function showGame(game) {
@@ -46,9 +40,7 @@ function showGame(game) {
     if (game === 'xo') startXO();
 }
 
-// ===== ЗМЕЙКА =====
 let snake, food, direction, snakeInterval, snakeScore;
-
 function startSnake() {
     const canvas = document.getElementById('snakeCanvas');
     const ctx = canvas.getContext('2d');
@@ -61,8 +53,7 @@ function startSnake() {
     
     function gameLoop() {
         let head = {x: snake[0].x + direction.x, y: snake[0].y + direction.y};
-        if (head.x < 0 || head.x >= 20 || head.y < 0 || head.y >= 20 || 
-            snake.some(s => s.x === head.x && s.y === head.y)) {
+        if (head.x < 0 || head.x >= 20 || head.y < 0 || head.y >= 20 || snake.some(s => s.x === head.x && s.y === head.y)) {
             clearInterval(snakeInterval);
             alert('Игра окончена! Счёт: ' + snakeScore);
             return;
@@ -72,31 +63,22 @@ function startSnake() {
             snakeScore += 10;
             document.getElementById('snakeScore').textContent = snakeScore;
             food = {x: Math.floor(Math.random()*20), y: Math.floor(Math.random()*20)};
-        } else {
-            snake.pop();
-        }
-        
-        ctx.fillStyle = '#000';
-        ctx.fillRect(0, 0, 400, 400);
-        ctx.fillStyle = '#0f0';
-        snake.forEach(s => ctx.fillRect(s.x*20, s.y*20, 18, 18));
-        ctx.fillStyle = '#f00';
-        ctx.fillRect(food.x*20, food.y*20, 18, 18);
+        } else { snake.pop(); }
+        ctx.fillStyle = '#000'; ctx.fillRect(0, 0, 400, 400);
+        ctx.fillStyle = '#0f0'; snake.forEach(s => ctx.fillRect(s.x*20, s.y*20, 18, 18));
+        ctx.fillStyle = '#f00'; ctx.fillRect(food.x*20, food.y*20, 18, 18);
     }
     
-    document.addEventListener('keydown', e => {
+    document.addEventListener('keydown', function handler(e) {
         if (e.key === 'ArrowUp' && direction.y === 0) direction = {x: 0, y: -1};
         if (e.key === 'ArrowDown' && direction.y === 0) direction = {x: 0, y: 1};
         if (e.key === 'ArrowLeft' && direction.x === 0) direction = {x: -1, y: 0};
         if (e.key === 'ArrowRight' && direction.x === 0) direction = {x: 1, y: 0};
     });
-    
     snakeInterval = setInterval(gameLoop, 100);
 }
 
-// ===== ТЕТРИС =====
 let tetrisBoard, tetrisPiece, tetrisScore, tetrisInterval;
-
 function startTetris() {
     const canvas = document.getElementById('tetrisCanvas');
     const ctx = canvas.getContext('2d');
@@ -105,152 +87,88 @@ function startTetris() {
     document.getElementById('tetrisScore').textContent = '0';
     if (tetrisInterval) clearInterval(tetrisInterval);
     
-    const pieces = [
-        [[1,1,1,1]], [[1,1],[1,1]], [[1,1,1],[0,1,0]], 
-        [[1,1,0],[0,1,1]], [[0,1,1],[1,1,0]]
-    ];
+    const pieces = [[[1,1,1,1]], [[1,1],[1,1]], [[1,1,1],[0,1,0]], [[1,1,0],[0,1,1]], [[0,1,1],[1,1,0]]];
     
     function newPiece() {
-        tetrisPiece = {
-            shape: pieces[Math.floor(Math.random()*pieces.length)],
-            x: 3,
-            y: 0
-        };
-        if (collision()) {
-            clearInterval(tetrisInterval);
-            alert('Игра окончена! Счёт: ' + tetrisScore);
-        }
+        tetrisPiece = {shape: pieces[Math.floor(Math.random()*pieces.length)], x: 3, y: 0};
+        if (collision()) { clearInterval(tetrisInterval); alert('Игра окончена! Счёт: ' + tetrisScore); }
     }
     
     function collision() {
-        for (let y = 0; y < tetrisPiece.shape.length; y++) {
-            for (let x = 0; x < tetrisPiece.shape[y].length; x++) {
+        for (let y = 0; y < tetrisPiece.shape.length; y++)
+            for (let x = 0; x < tetrisPiece.shape[y].length; x++)
                 if (tetrisPiece.shape[y][x]) {
-                    let newX = tetrisPiece.x + x;
-                    let newY = tetrisPiece.y + y;
-                    if (newX < 0 || newX >= 10 || newY >= 30) return true;
-                    if (newY >= 0 && tetrisBoard[newY][newX]) return true;
+                    let nx = tetrisPiece.x + x, ny = tetrisPiece.y + y;
+                    if (nx < 0 || nx >= 10 || ny >= 30) return true;
+                    if (ny >= 0 && tetrisBoard[ny][nx]) return true;
                 }
-            }
-        }
         return false;
     }
     
     function merge() {
-        for (let y = 0; y < tetrisPiece.shape.length; y++) {
-            for (let x = 0; x < tetrisPiece.shape[y].length; x++) {
-                if (tetrisPiece.shape[y][x]) {
-                    tetrisBoard[tetrisPiece.y + y][tetrisPiece.x + x] = 1;
-                }
-            }
-        }
-        // Check lines
-        for (let y = 29; y >= 0; y--) {
+        for (let y = 0; y < tetrisPiece.shape.length; y++)
+            for (let x = 0; x < tetrisPiece.shape[y].length; x++)
+                if (tetrisPiece.shape[y][x]) tetrisBoard[tetrisPiece.y + y][tetrisPiece.x + x] = 1;
+        for (let y = 29; y >= 0; y--)
             if (tetrisBoard[y].every(c => c === 1)) {
-                tetrisBoard.splice(y, 1);
-                tetrisBoard.unshift(Array(10).fill(0));
-                tetrisScore += 100;
-                document.getElementById('tetrisScore').textContent = tetrisScore;
+                tetrisBoard.splice(y, 1); tetrisBoard.unshift(Array(10).fill(0));
+                tetrisScore += 100; document.getElementById('tetrisScore').textContent = tetrisScore;
             }
-        }
     }
     
     function draw() {
-        ctx.fillStyle = '#000';
-        ctx.fillRect(0, 0, 300, 600);
-        for (let y = 0; y < 30; y++) {
-            for (let x = 0; x < 10; x++) {
-                if (tetrisBoard[y][x]) {
-                    ctx.fillStyle = '#00f';
-                    ctx.fillRect(x*30, y*20, 28, 18);
-                }
-            }
-        }
+        ctx.fillStyle = '#000'; ctx.fillRect(0, 0, 300, 600);
+        for (let y = 0; y < 30; y++)
+            for (let x = 0; x < 10; x++)
+                if (tetrisBoard[y][x]) { ctx.fillStyle = '#00f'; ctx.fillRect(x*30, y*20, 28, 18); }
         if (tetrisPiece) {
             ctx.fillStyle = '#ff0';
-            for (let y = 0; y < tetrisPiece.shape.length; y++) {
-                for (let x = 0; x < tetrisPiece.shape[y].length; x++) {
-                    if (tetrisPiece.shape[y][x]) {
-                        ctx.fillRect((tetrisPiece.x+x)*30, (tetrisPiece.y+y)*20, 28, 18);
-                    }
-                }
-            }
+            for (let y = 0; y < tetrisPiece.shape.length; y++)
+                for (let x = 0; x < tetrisPiece.shape[y].length; x++)
+                    if (tetrisPiece.shape[y][x]) ctx.fillRect((tetrisPiece.x+x)*30, (tetrisPiece.y+y)*20, 28, 18);
         }
     }
     
-    function tick() {
-        tetrisPiece.y++;
-        if (collision()) {
-            tetrisPiece.y--;
-            merge();
-            newPiece();
-        }
-        draw();
-    }
+    function tick() { tetrisPiece.y++; if (collision()) { tetrisPiece.y--; merge(); newPiece(); } draw(); }
     
-    document.addEventListener('keydown', e => {
+    document.addEventListener('keydown', function handler(e) {
         if (!tetrisPiece) return;
-        let moved = null;
-        if (e.key === 'ArrowLeft') moved = {...tetrisPiece, x: tetrisPiece.x - 1};
-        if (e.key === 'ArrowRight') moved = {...tetrisPiece, x: tetrisPiece.x + 1};
-        if (e.key === 'ArrowDown') moved = {...tetrisPiece, y: tetrisPiece.y + 1};
-        if (e.key === 'ArrowUp') {
-            let rotated = tetrisPiece.shape[0].map((_, i) => 
-                tetrisPiece.shape.map(row => row[i]).reverse()
-            );
-            moved = {...tetrisPiece, shape: rotated};
-        }
-        if (moved) {
-            let old = tetrisPiece;
-            tetrisPiece = moved;
-            if (collision()) tetrisPiece = old;
-            draw();
-        }
+        let old = tetrisPiece;
+        if (e.key === 'ArrowLeft') tetrisPiece = {...tetrisPiece, x: tetrisPiece.x - 1};
+        if (e.key === 'ArrowRight') tetrisPiece = {...tetrisPiece, x: tetrisPiece.x + 1};
+        if (e.key === 'ArrowDown') tetrisPiece = {...tetrisPiece, y: tetrisPiece.y + 1};
+        if (e.key === 'ArrowUp') tetrisPiece = {...tetrisPiece, shape: tetrisPiece.shape[0].map((_, i) => tetrisPiece.shape.map(row => row[i]).reverse())};
+        if (collision()) tetrisPiece = old;
+        draw();
     });
     
-    newPiece();
-    tetrisInterval = setInterval(tick, 500);
-    draw();
+    newPiece(); tetrisInterval = setInterval(tick, 500); draw();
 }
 
-// ===== КРЕСТИКИ-НОЛИКИ =====
 let xoBoard, xoTurn, xoGameOver;
-
 function startXO() {
     const board = document.getElementById('xoBoard');
-    xoBoard = Array(9).fill('');
-    xoTurn = 'X';
-    xoGameOver = false;
+    xoBoard = Array(9).fill(''); xoTurn = 'X'; xoGameOver = false;
     document.getElementById('xoStatus').textContent = 'Ход: ❌';
     board.innerHTML = '';
     for (let i = 0; i < 9; i++) {
         let cell = document.createElement('div');
         cell.style.cssText = 'width:100px;height:100px;border:2px solid var(--border);display:flex;align-items:center;justify-content:center;font-size:40px;cursor:pointer;';
-        cell.onclick = () => xoClick(i, cell);
+        cell.onclick = () => {
+            if (xoBoard[i] || xoGameOver) return;
+            xoBoard[i] = xoTurn; cell.textContent = xoTurn === 'X' ? '❌' : '⭕';
+            const wins = [[0,1,2],[3,4,5],[6,7,8],[0,3,6],[1,4,7],[2,5,8],[0,4,8],[2,4,6]];
+            for (let w of wins)
+                if (xoBoard[w[0]] && xoBoard[w[0]] === xoBoard[w[1]] && xoBoard[w[0]] === xoBoard[w[2]]) {
+                    document.getElementById('xoStatus').textContent = 'Победил: ' + (xoTurn === 'X' ? '❌' : '⭕');
+                    xoGameOver = true; return;
+                }
+            if (xoBoard.every(c => c)) { document.getElementById('xoStatus').textContent = 'Ничья!'; xoGameOver = true; return; }
+            xoTurn = xoTurn === 'X' ? 'O' : 'X';
+            document.getElementById('xoStatus').textContent = 'Ход: ' + (xoTurn === 'X' ? '❌' : '⭕');
+        };
         board.appendChild(cell);
     }
-}
-
-function xoClick(i, cell) {
-    if (xoBoard[i] || xoGameOver) return;
-    xoBoard[i] = xoTurn;
-    cell.textContent = xoTurn === 'X' ? '❌' : '⭕';
-    
-    const wins = [[0,1,2],[3,4,5],[6,7,8],[0,3,6],[1,4,7],[2,5,8],[0,4,8],[2,4,6]];
-    for (let w of wins) {
-        if (xoBoard[w[0]] && xoBoard[w[0]] === xoBoard[w[1]] && xoBoard[w[0]] === xoBoard[w[2]]) {
-            document.getElementById('xoStatus').textContent = 'Победил: ' + (xoTurn === 'X' ? '❌' : '⭕');
-            xoGameOver = true;
-            return;
-        }
-    }
-    if (xoBoard.every(c => c)) {
-        document.getElementById('xoStatus').textContent = 'Ничья!';
-        xoGameOver = true;
-        return;
-    }
-    xoTurn = xoTurn === 'X' ? 'O' : 'X';
-    document.getElementById('xoStatus').textContent = 'Ход: ' + (xoTurn === 'X' ? '❌' : '⭕');
 }
 
 startSnake();
