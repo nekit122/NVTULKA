@@ -15,6 +15,7 @@ if database_url and database_url.startswith('postgres://'):
 app.config['SQLALCHEMY_DATABASE_URI'] = database_url
 app.config['UPLOAD_FOLDER'] = 'static/uploads'
 app.config['AVATARS_FOLDER'] = 'static/avatars'
+app.config['MUSIC_FOLDER'] = 'static/music'
 app.config['MAX_CONTENT_LENGTH'] = 100 * 1024 * 1024
 db = SQLAlchemy(app)
 login_manager = LoginManager()
@@ -23,6 +24,7 @@ login_manager.login_view = 'login'
 
 os.makedirs(app.config['UPLOAD_FOLDER'], exist_ok=True)
 os.makedirs(app.config['AVATARS_FOLDER'], exist_ok=True)
+os.makedirs(app.config['MUSIC_FOLDER'], exist_ok=True)
 
 # ========== МОДЕЛИ ==========
 
@@ -36,6 +38,7 @@ class User(UserMixin, db.Model):
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
     posts = db.relationship('Post', backref='author', lazy=True, foreign_keys='Post.user_id')
     notifications = db.relationship('Notification', backref='user', lazy=True, foreign_keys='Notification.user_id')
+    stories = db.relationship('Story', backref='user', lazy=True)
 
 class Post(db.Model):
     id = db.Column(db.Integer, primary_key=True)
@@ -109,6 +112,13 @@ class ProfileView(db.Model):
     viewer_id = db.Column(db.Integer, db.ForeignKey('user.id'))
     viewed_at = db.Column(db.DateTime, default=datetime.utcnow)
 
+class Story(db.Model):
+    id = db.Column(db.Integer, primary_key=True)
+    user_id = db.Column(db.Integer, db.ForeignKey('user.id'), nullable=False)
+    filename = db.Column(db.String(200), nullable=False)
+    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+    is_video = db.Column(db.Boolean, default=False)
+
 @login_manager.user_loader
 def load_user(user_id):
     return db.session.get(User, int(user_id))
@@ -121,7 +131,7 @@ def extract_hashtags(text):
 def save_file(file, folder):
     if file and file.filename:
         ext = os.path.splitext(file.filename)[1].lower()
-        if ext in ['.jpg', '.jpeg', '.png', '.gif', '.mp4', '.mov', '.avi', '.webp']:
+        if ext in ['.jpg', '.jpeg', '.png', '.gif', '.mp4', '.mov', '.avi', '.webp', '.mp3', '.webm']:
             filename = f"{datetime.utcnow().timestamp():.0f}_{secure_filename(file.filename)}"
             file.save(os.path.join(folder, filename))
             return filename
@@ -145,11 +155,15 @@ def index():
 @app.route('/register', methods=['GET', 'POST'])
 def register():
     if request.method == 'POST':
-        username = request.form['username']
-        email = request.form['email']
-        password = request.form['password']
+        username = request.form.get('username', '').strip()
+        email = request.form.get('email', '').strip()
+        password = request.form.get('password', '')
+        if not username or not email or not password:
+            return render_template('register.html', error='Все поля обязательны')
         if User.query.filter_by(username=username).first():
-            return render_template('register.html', error='Пользователь уже существует')
+            return render_template('register.html', error='Логин занят')
+        if User.query.filter_by(email=email).first():
+            return render_template('register.html', error='Email используется')
         hashed_pw = generate_password_hash(password, method='scrypt')
         new_user = User(username=username, email=email, password_hash=hashed_pw)
         db.session.add(new_user)
@@ -178,7 +192,8 @@ def logout():
 @login_required
 def recommendations():
     posts = Post.query.filter(Post.original_post_id == None).order_by(Post.created_at.desc()).all()
-    return render_template('recommendations.html', posts=posts, unread_count=get_unread_count())
+    stories = Story.query.filter(Story.created_at > datetime.utcnow().timestamp() - 86400).order_by(Story.created_at.desc()).all()
+    return render_template('recommendations.html', posts=posts, stories=stories, unread_count=get_unread_count())
 
 @app.route('/feed')
 @login_required
@@ -222,6 +237,19 @@ def send_message(receiver_id):
         db.session.add(msg)
         db.session.commit()
         return jsonify({'status': 'ok', 'timestamp': msg.timestamp.strftime('%H:%M')})
+    return jsonify({'status': 'error'}), 400
+
+@app.route('/send_voice/<int:receiver_id>', methods=['POST'])
+@login_required
+def send_voice(receiver_id):
+    audio = request.files.get('audio')
+    if audio:
+        filename = f"voice_{datetime.utcnow().timestamp():.0f}.webm"
+        audio.save(os.path.join(app.config['UPLOAD_FOLDER'], filename))
+        msg = Message(sender_id=current_user.id, receiver_id=receiver_id, content=f"[VOICE]{filename}")
+        db.session.add(msg)
+        db.session.commit()
+        return jsonify({'status': 'ok'})
     return jsonify({'status': 'error'}), 400
 
 @app.route('/search')
@@ -489,6 +517,40 @@ def profile():
     return render_template('profile.html', user=current_user, posts=user_posts,
                           followers_count=followers_count, following_count=following_count,
                           profile_views=profile_views, unread_count=get_unread_count())
+
+@app.route('/games')
+@login_required
+def games():
+    return render_template('games.html', unread_count=get_unread_count())
+
+@app.route('/music')
+@login_required
+def music():
+    music_files = []
+    if os.path.exists(app.config['MUSIC_FOLDER']):
+        music_files = [f for f in os.listdir(app.config['MUSIC_FOLDER']) if f.endswith('.mp3')]
+    return render_template('music.html', music_files=music_files, unread_count=get_unread_count())
+
+@app.route('/upload_music', methods=['POST'])
+@login_required
+def upload_music():
+    file = request.files.get('music')
+    if file:
+        filename = save_file(file, app.config['MUSIC_FOLDER'])
+    return redirect(url_for('music'))
+
+@app.route('/create_story', methods=['POST'])
+@login_required
+def create_story():
+    file = request.files.get('story')
+    if file:
+        filename = save_file(file, app.config['UPLOAD_FOLDER'])
+        if filename:
+            is_video = filename.endswith('.mp4') or filename.endswith('.mov')
+            story = Story(user_id=current_user.id, filename=filename, is_video=is_video)
+            db.session.add(story)
+            db.session.commit()
+    return redirect(request.referrer or url_for('recommendations'))
 
 # ========== СОЗДАНИЕ ТАБЛИЦ ==========
 with app.app_context():
